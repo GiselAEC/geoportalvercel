@@ -417,7 +417,11 @@ async function generarPDF() {
 
         status('Generando PDF con ' + reportes.length + ' reporte(s)...');
 
-        var jsPDF = window.jspdf.jsPDF;
+        var jsPDF = (window.jspdf && window.jspdf.jsPDF) || window.jsPDF;
+        if (!jsPDF) {
+            status('Error: jsPDF no se cargo correctamente. Recarga la pagina.');
+            return;
+        }
         var doc = new jsPDF('l', 'mm', 'letter');
 
         var pageWidth = doc.internal.pageSize.getWidth();
