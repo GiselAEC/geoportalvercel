@@ -1,0 +1,399 @@
+/* styles.css v1.1 */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Segoe UI', Arial, Helvetica, sans-serif;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: #1a1a2e;
+  overflow: hidden;
+}
+
+/* ===== Header ===== */
+
+#header {
+  background: linear-gradient(135deg, #0f3460, #16213e);
+  color: white;
+  padding: 10px 20px;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+  z-index: 1000;
+}
+
+#header h1 {
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+#header .subtitle {
+  font-size: 11px;
+  color: #a0c4ff;
+  margin-top: 2px;
+}
+
+/* ===== Layout principal ===== */
+
+#main {
+  flex: 1;
+  display: flex;
+  position: relative;
+  overflow: hidden;
+}
+
+#sidebar {
+  width: 320px;
+  background: #16213e;
+  color: #e0e0e0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 2px 0 10px rgba(0,0,0,0.3);
+  z-index: 999;
+}
+
+#map {
+  flex: 1;
+}
+
+/* ===== Secciones del sidebar ===== */
+
+.sidebar-section {
+  padding: 12px 15px;
+  border-bottom: 1px solid #1a1a3e;
+}
+
+.sidebar-section h3 {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #a0c4ff;
+  margin-bottom: 8px;
+}
+
+/* ===== Tarjetas de capa ===== */
+
+.layer-card {
+  background: #1a1a3e;
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.layer-card:hover {
+  background: #253565;
+}
+
+.layer-card.active {
+  background: #0f3460;
+  border-left: 3px solid #4fc3f7;
+}
+
+/* Toggle checkbox visual */
+
+.layer-toggle {
+  width: 18px;
+  height: 18px;
+  border-radius: 3px;
+  border: 2px solid #555;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.layer-toggle.on {
+  border-color: #4fc3f7;
+  background: #4fc3f7;
+}
+
+.layer-toggle.on::after {
+  content: '\2713';
+  color: #16213e;
+  font-size: 11px;
+  font-weight: bold;
+}
+
+.layer-color {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  border: 1px solid rgba(255,255,255,0.2);
+}
+
+.layer-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.layer-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #e0e0e0;
+}
+
+.layer-desc {
+  font-size: 10px;
+  color: #888;
+  margin-top: 2px;
+}
+
+/* ===== Barra de carga ===== */
+
+#loading-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #4fc3f7, #00e676);
+  z-index: 9999;
+  transition: width 0.3s;
+  display: none;
+}
+
+#loading-bar.visible {
+  display: block;
+}
+
+/* ===== Barra de estado ===== */
+
+#status-bar {
+  position: absolute;
+  bottom: 15px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(22,33,62,0.95);
+  color: #e0e0e0;
+  padding: 8px 18px;
+  border-radius: 20px;
+  font-size: 12px;
+  z-index: 999;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.4);
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+/* ===== Leyenda ===== */
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+  font-size: 11px;
+}
+
+.legend-symbol {
+  width: 20px;
+  display: flex;
+  justify-content: center;
+}
+
+.legend-line {
+  width: 18px;
+  height: 3px;
+  border-radius: 2px;
+}
+
+.legend-poly {
+  width: 14px;
+  height: 14px;
+  border-radius: 2px;
+}
+
+.legend-point {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+/* ===== Panel de información ===== */
+
+.info-panel {
+  background: #1a1a3e;
+  border-radius: 6px;
+  padding: 12px;
+  margin-top: 6px;
+}
+
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  padding: 3px 0;
+  border-bottom: 1px solid #0f1a3e;
+}
+
+.info-row:last-child {
+  border: none;
+}
+
+.info-label {
+  color: #888;
+}
+
+.info-value {
+  color: #e0e0e0;
+  font-weight: 500;
+}
+
+/* ===== Botón cargar ===== */
+
+.btn-cargar {
+  width: 100%;
+  padding: 10px;
+  background: linear-gradient(135deg, #00897b, #00695c);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 13px;
+  transition: opacity 0.2s;
+}
+
+.btn-cargar:hover {
+  opacity: 0.9;
+}
+
+.btn-cargar:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.btn-cargar.cargado {
+  background: linear-gradient(135deg, #2e7d32, #1b5e20);
+}
+
+.btn-reportar {
+  display: block;
+  width: 100%;
+  padding: 10px;
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: #0f172a;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 13px;
+  text-align: center;
+  text-decoration: none;
+  margin-top: 8px;
+  transition: opacity 0.2s;
+}
+
+.btn-reportar:hover {
+  opacity: 0.9;
+}
+
+/* ===== Controles Leaflet ===== */
+
+.leaflet-control-zoom a {
+  background: #16213e !important;
+  color: #a0c4ff !important;
+  border-color: #1a1a3e !important;
+}
+
+.leaflet-control-zoom a:hover {
+  background: #1a1a3e !important;
+}
+
+.leaflet-control-layers {
+  background: #16213e !important;
+  color: #e0e0e0 !important;
+  border-color: #1a1a3e !important;
+  border-radius: 6px !important;
+}
+
+.leaflet-control-layers-toggle {
+  background-color: #16213e !important;
+  border-color: #1a1a3e !important;
+  width: 36px !important;
+  height: 36px !important;
+  background-image: url('') !important;
+}
+
+/* ===== Popups ===== */
+
+.leaflet-popup-content-wrapper {
+  border-radius: 8px !important;
+  box-shadow: 0 3px 14px rgba(0,0,0,0.3) !important;
+}
+
+.leaflet-popup-content {
+  margin: 10px 14px !important;
+  font-family: 'Segoe UI', Arial, sans-serif !important;
+}
+
+.popup-title {
+  font-weight: 700;
+  color: #0f3460;
+  font-size: 14px;
+  margin-bottom: 6px;
+  padding-bottom: 4px;
+  border-bottom: 2px solid #4fc3f7;
+}
+
+.popup-row {
+  font-size: 12px;
+  padding: 2px 0;
+  display: flex;
+  gap: 6px;
+}
+
+.popup-key {
+  font-weight: 600;
+  color: #555;
+  white-space: nowrap;
+}
+
+.popup-val {
+  color: #333;
+}
+
+/* ===== Footer ===== */
+
+#footer {
+  background: #0f1a3e;
+  color: #94a3b8;
+  text-align: center;
+  padding: 6px 8px;
+  font-size: 11px;
+  letter-spacing: 1px;
+  border-top: 1px solid #1a2a4e;
+  z-index: 1000;
+  flex-shrink: 0;
+}
+
+/* ===== Responsive ===== */
+
+@media (max-width: 768px) {
+  #sidebar {
+    width: 100%;
+    height: auto;
+    max-height: 40vh;
+    order: 2;
+  }
+  #map {
+    order: 1;
+  }
+  #footer {
+    order: 3;
+  }
+}

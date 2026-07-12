@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Geoportal - Baños de Agua Santa</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+<link rel="stylesheet" href="/styles.css"/>
+</head>
+<body>
+
+<div id="loading-bar"></div>
+
+<div id="header">
+  <i class="fas fa-mountain" style="font-size:22px;color:#4fc3f7;"></i>
+  <div>
+    <h1>Geoportal Baños de Agua Santa</h1>
+    <div class="subtitle">Riesgos y Capas Territoriales - Tungurahua, Ecuador</div>
+  </div>
+</div>
+
+<div id="main">
+  <div id="sidebar">
+
+    <div class="sidebar-section">
+      <h3><i class="fas fa-layer-group"></i> Capas</h3>
+      <div id="layer-list">
+        <div class="layer-card" data-layer="cantonbanos" onclick="toggleLayer('cantonbanos')">
+          <div class="layer-toggle" id="toggle-cantonbanos"></div>
+          <div class="layer-color" style="background:#2196f3;"></div>
+          <div class="layer-info">
+            <div class="layer-name">Cantón Baños</div>
+            <div class="layer-desc">Límite territorial - MULTIPOLYGON</div>
+          </div>
+        </div>
+        <div class="layer-card" data-layer="laharestungurahua" onclick="toggleLayer('laharestungurahua')">
+          <div class="layer-toggle" id="toggle-laharestungurahua"></div>
+          <div class="layer-color" style="background:#f44336;"></div>
+          <div class="layer-info">
+            <div class="layer-name">Lahares Tungurahua</div>
+            <div class="layer-desc">Zonas de flujo de lahar - MULTIPOLYGON</div>
+          </div>
+        </div>
+        <div class="layer-card" data-layer="fallasbanos" onclick="toggleLayer('fallasbanos')">
+          <div class="layer-toggle" id="toggle-fallasbanos"></div>
+          <div class="layer-color" style="background:#ff9800;"></div>
+          <div class="layer-info">
+            <div class="layer-name">Fallas Geológicas</div>
+            <div class="layer-desc">Líneas de falla - MULTILINESTRING</div>
+          </div>
+        </div>
+        <div class="layer-card" data-layer="viasbanos" onclick="toggleLayer('viasbanos')">
+          <div class="layer-toggle" id="toggle-viasbanos"></div>
+          <div class="layer-color" style="background:#4caf50;"></div>
+          <div class="layer-info">
+            <div class="layer-name">Vías</div>
+            <div class="layer-desc">Red vial - MULTILINESTRING</div>
+          </div>
+        </div>
+        <div class="layer-card" data-layer="casasbanos" onclick="toggleLayer('casasbanos')">
+          <div class="layer-toggle" id="toggle-casasbanos"></div>
+          <div class="layer-color" style="background:#9c27b0;"></div>
+          <div class="layer-info">
+            <div class="layer-name">Casas / Edificaciones</div>
+            <div class="layer-desc">Puntos de edificaciones - POINT</div>
+          </div>
+        </div>
+        <div class="layer-card" data-layer="reportes_ciudadanos" onclick="toggleLayer('reportes_ciudadanos')">
+          <div class="layer-toggle" id="toggle-reportes_ciudadanos"></div>
+          <div class="layer-color" style="background:#92400e;"></div>
+          <div class="layer-info">
+            <div class="layer-name">Reportes Ciudadanos</div>
+            <div class="layer-desc">Reportes de problemas - POINT</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <button class="btn-cargar" id="btn-cargar" onclick="cargarTodasLasCapas()">
+        <i class="fas fa-download"></i> Cargar Todas las Capas
+      </button>
+      <a href="/formulario.html" class="btn-reportar">
+        <i class="fas fa-exclamation-triangle"></i> Reportar un Problema
+      </a>
+    </div>
+
+    <div class="sidebar-section">
+      <h3><i class="fas fa-info-circle"></i> Información</h3>
+      <div class="info-panel" id="info-panel">
+        <div style="font-size:11px;color:#888;text-align:center;padding:8px;">
+          Haz clic en una feature del mapa para ver sus atributos
+        </div>
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <h3><i class="fas fa-palette"></i> Leyenda</h3>
+      <div class="legend-item">
+        <div class="legend-symbol"><div class="legend-poly" style="background:rgba(33,150,243,0.3);border:2px solid #2196f3;"></div></div>
+        <span>Cantón Baños</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-symbol"><div class="legend-poly" style="background:rgba(244,67,54,0.3);border:2px solid #f44336;"></div></div>
+        <span>Lahares Tungurahua</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-symbol"><div class="legend-line" style="background:#ff9800;"></div></div>
+        <span>Fallas Geológicas</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-symbol"><div class="legend-line" style="background:#4caf50;"></div></div>
+        <span>Vías</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-symbol"><div class="legend-point" style="background:#9c27b0;"></div></div>
+        <span>Casas / Edificaciones</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-symbol"><div class="legend-point" style="background:#92400e;border:2px solid #fff;"></div></div>
+        <span>Reportes Ciudadanos</span>
+      </div>
+    </div>
+
+  </div>
+
+  <div id="map"></div>
+  <div id="status-bar">Listo — Selecciona capas y carga los datos</div>
+</div>
+
+<div id="footer">
+  UTPL 2026 — Especialidad SIG
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script type="module" src="/src/app.js"></script>
+</body>
+</html>
