@@ -142,15 +142,14 @@ const capasConfig = {
     reportes_ciudadanos: {
         nombre: 'Reportes Ciudadanos',
         color: '#92400e',
-        camposPopup: ['id','tipo_problema','comentario','nombre','telefono','fecha','estado'],
+        camposPopup: ['id','tipo_problema','comentario','nombre','telefono','fecha'],
         camposLabels: {
             id: 'Numero',
             tipo_problema: 'Tipo de Problema',
             comentario: 'Comentario',
             nombre: 'Nombre',
             telefono: 'Telefono',
-            fecha: 'Fecha',
-            estado: 'Estado'
+            fecha: 'Fecha'
         },
         orden: 6
     }
