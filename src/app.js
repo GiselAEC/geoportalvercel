@@ -354,6 +354,15 @@ async function cargarTabla(tabla, cfg) {
 
 // ===== Popups e info =====
 
+function formatearEstado(val) {
+    var mapa = {
+        pendiente: 'Pendiente', dependiente: 'Dependiente',
+        trabajando: 'Trabajando', completado: 'Completado',
+        en_revision: 'En Revision', resuelto: 'Resuelto', rechazado: 'Rechazado'
+    };
+    return mapa[val] || val.charAt(0).toUpperCase() + val.slice(1);
+}
+
 function construirPopup(props, tabla, cfg) {
     var html = '<div class="popup-title">' + cfg.nombre + '</div>';
     var campos = cfg.camposPopup || Object.keys(props);
@@ -362,6 +371,7 @@ function construirPopup(props, tabla, cfg) {
         var val = props[k];
         if (val === null || val === undefined || val === '') return;
         var label = (cfg.camposLabels && cfg.camposLabels[k]) || k;
+        if (k === 'estado' && tabla === 'reportes_ciudadanos') val = formatearEstado(val);
         html += '<div class="popup-row"><span class="popup-key">' + label + ':</span><span class="popup-val">' + val + '</span></div>';
     });
     return html;
@@ -381,12 +391,7 @@ function mostrarInfoPanel(props, tabla, cfg) {
                 { valor: 'trabajando', label: 'Trabajando', color: '#0369a1' },
                 { valor: 'completado', label: 'Completado', color: '#3f6212' }
             ];
-            var estadosDisplay = {
-                pendiente: 'Pendiente', dependiente: 'Dependiente',
-                trabajando: 'Trabajando', completado: 'Completado',
-                en_revision: 'En Revision', resuelto: 'Resuelto', rechazado: 'Rechazado'
-            };
-            panelHtml += '<div class="info-row"><span class="info-label">' + label + '</span><span class="info-value">' + (estadosDisplay[val] || val) + '</span></div>';
+            panelHtml += '<div class="info-row"><span class="info-label">' + label + '</span><span class="info-value">' + formatearEstado(val) + '</span></div>';
             panelHtml += '<div class="estado-changer">';
             panelHtml += '<div class="estado-changer-title">Cambiar estado:</div>';
             panelHtml += '<div class="estado-buttons">';
