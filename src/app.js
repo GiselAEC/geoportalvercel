@@ -378,6 +378,216 @@ function mostrarInfoPanel(props, tabla, cfg) {
     document.getElementById('info-panel').innerHTML = panelHtml;
 }
 
+// ===== Generar PDF de Reportes =====
+
+async function generarPDF() {
+    if (!SUPABASE_URL || !SUPABASE_KEY) {
+        status('Error: Variables de entorno no configuradas');
+        return;
+    }
+
+    var btn = document.getElementById('btn-pdf');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generando...';
+    showLoading(true);
+    status('Consultando reportes...');
+
+    try {
+        var r = await fetch(SUPABASE_URL + '/reportes_ciudadanos?select=*&order=id.asc&limit=5000', {
+            headers: {
+                apikey: SUPABASE_KEY,
+                Authorization: 'Bearer ' + SUPABASE_KEY
+            }
+        });
+
+        if (!r.ok) {
+            status('Error al consultar reportes: ' + r.status, 'red');
+            return;
+        }
+
+        var reportes = await r.json();
+
+        if (!Array.isArray(reportes) || reportes.length === 0) {
+            status('No hay reportes para generar el PDF');
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-file-pdf"></i> Generar PDF Reportes';
+            showLoading(false);
+            return;
+        }
+
+        status('Generando PDF con ' + reportes.length + ' reporte(s)...');
+
+        var jsPDF = window.jspdf.jsPDF;
+        var doc = new jsPDF('l', 'mm', 'letter');
+
+        var pageWidth = doc.internal.pageSize.getWidth();
+        var pageHeight = doc.internal.pageSize.getHeight();
+
+        // ===== Portada =====
+        doc.setFillColor(15, 52, 96);
+        doc.rect(0, 0, pageWidth, pageHeight, 'F');
+
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(28);
+        doc.setFont('helvetica', 'bold');
+        doc.text('REPORTE DE PROBLEMAS CIUDADANOS', pageWidth / 2, 50, { align: 'center' });
+
+        doc.setFontSize(16);
+        doc.setFont('helvetica', 'normal');
+        doc.text('Banos de Agua Santa — Tungurahua, Ecuador', pageWidth / 2, 65, { align: 'center' });
+
+        doc.setFontSize(12);
+        doc.text('Especialidad SIG — UTPL 2026', pageWidth / 2, 80, { align: 'center' });
+
+        var fechaGen = new Date().toLocaleDateString('es-EC', {
+            year: 'numeric', month: 'long', day: 'numeric',
+            hour: '2-digit', minute: '2-digit'
+        });
+        doc.setFontSize(10);
+        doc.text('Fecha de generacion: ' + fechaGen, pageWidth / 2, 95, { align: 'center' });
+
+        // Estadisticas
+        var total = reportes.length;
+        var pendientes = reportes.filter(function(r) { return r.estado === 'pendiente'; }).length;
+        var revision = reportes.filter(function(r) { return r.estado === 'en_revision'; }).length;
+        var resueltos = reportes.filter(function(r) { return r.estado === 'resuelto'; }).length;
+        var rechazados = reportes.filter(function(r) { return r.estado === 'rechazado'; }).length;
+
+        doc.setFillColor(30, 41, 59);
+        doc.roundedRect(40, 110, pageWidth - 80, 50, 3, 3, 'F');
+
+        doc.setFontSize(14);
+        doc.setFont('helvetica', 'bold');
+        doc.text('RESUMEN', pageWidth / 2, 125, { align: 'center' });
+
+        doc.setFontSize(11);
+        doc.setFont('helvetica', 'normal');
+        var col1 = 70;
+        var col2 = 150;
+        var yStat = 138;
+
+        doc.text('Total de reportes: ' + total, col1, yStat);
+        doc.text('Pendientes: ' + pendientes, col2, yStat);
+        doc.text('En revision: ' + revision, col1, yStat + 8);
+        doc.text('Resueltos: ' + resueltos, col2, yStat + 8);
+        doc.text('Rechazados: ' + rechazados, col1, yStat + 16);
+
+        // ===== Pagina 2: Tabla de reportes =====
+        doc.addPage();
+
+        doc.setFillColor(15, 52, 96);
+        doc.rect(0, 0, pageWidth, 14, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(12);
+        doc.setFont('helvetica', 'bold');
+        doc.text('DETALLE DE REPORTES', pageWidth / 2, 10, { align: 'center' });
+
+        doc.setTextColor(0, 0, 0);
+
+        var tiposLabel = {
+            bache_via: 'Bache en via',
+            alumbrado_deficiente: 'Alumbrado deficiente',
+            basura_acumulada: 'Basura acumulada',
+            deslave: 'Deslave / derrumbe',
+            inundacion: 'Inundacion',
+            senalizacion: 'Falta senalizacion',
+            acera_danada: 'Acera danada',
+            arbol_caido: 'Arbol caido',
+            fuga_agua: 'Fuga de agua',
+            peligro_volcanico: 'Peligro volcanico',
+            falla_geologica: 'Falla geologica',
+            vialidad_peligrosa: 'Vialidad peligrosa',
+            contaminacion: 'Contaminacion',
+            otro: 'Otro'
+        };
+
+        var estadosLabel = {
+            pendiente: 'Pendiente',
+            en_revision: 'En revision',
+            resuelto: 'Resuelto',
+            rechazado: 'Rechazado'
+        };
+
+        var tableData = reportes.map(function(rep) {
+            var fecha = '';
+            if (rep.fecha) {
+                var f = new Date(rep.fecha);
+                fecha = f.toLocaleDateString('es-EC') + ' ' + f.toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit' });
+            }
+            var lat = '';
+            var lng = '';
+            if (rep.geom && rep.geom.coordinates) {
+                lng = rep.geom.coordinates[0].toFixed(6);
+                lat = rep.geom.coordinates[1].toFixed(6);
+            }
+            return [
+                rep.id || '',
+                (tiposLabel[rep.tipo_problema] || rep.tipo_problema || '').substring(0, 25),
+                (rep.comentario || '').substring(0, 35),
+                (rep.nombre || '').substring(0, 18),
+                fecha,
+                (estadosLabel[rep.estado] || rep.estado || ''),
+                lat,
+                lng
+            ];
+        });
+
+        doc.autoTable({
+            startY: 20,
+            head: [['#', 'Tipo', 'Comentario', 'Nombre', 'Fecha', 'Estado', 'Lat', 'Lng']],
+            body: tableData,
+            theme: 'grid',
+            headStyles: {
+                fillColor: [15, 52, 96],
+                textColor: [255, 255, 255],
+                fontSize: 8,
+                fontStyle: 'bold'
+            },
+            bodyStyles: {
+                fontSize: 7,
+                textColor: [30, 30, 30]
+            },
+            alternateRowStyles: {
+                fillColor: [240, 245, 255]
+            },
+            columnStyles: {
+                0: { cellWidth: 12 },
+                1: { cellWidth: 40 },
+                2: { cellWidth: 60 },
+                3: { cellWidth: 30 },
+                4: { cellWidth: 40 },
+                5: { cellWidth: 25 },
+                6: { cellWidth: 25 },
+                7: { cellWidth: 25 }
+            },
+            margin: { left: 10, right: 10 },
+            didDrawPage: function(data) {
+                doc.setFontSize(7);
+                doc.setTextColor(150);
+                doc.text(
+                    'Geoportal Banos — UTPL 2026 Especialidad SIG — Pagina ' + doc.internal.getNumberOfPages(),
+                    pageWidth / 2, pageHeight - 8,
+                    { align: 'center' }
+                );
+            }
+        });
+
+        // Guardar
+        var nombreArchivo = 'Reportes_Banos_' + new Date().toISOString().slice(0, 10) + '.pdf';
+        doc.save(nombreArchivo);
+
+        status('PDF generado: ' + nombreArchivo, 'green');
+
+    } catch(err) {
+        console.error('Error generando PDF:', err);
+        status('Error al generar PDF: ' + err.message, 'red');
+    }
+
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-file-pdf"></i> Generar PDF Reportes';
+    showLoading(false);
+}
+
 // ===== Inicializacion =====
 
 window.addEventListener('load', function() {

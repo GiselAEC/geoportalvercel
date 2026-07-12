@@ -84,6 +84,9 @@
       <a href="/formulario.html" class="btn-reportar">
         <i class="fas fa-exclamation-triangle"></i> Reportar un Problema
       </a>
+      <button class="btn-pdf" id="btn-pdf" onclick="generarPDF()">
+        <i class="fas fa-file-pdf"></i> Generar PDF Reportes
+      </button>
     </div>
 
     <div class="sidebar-section">
@@ -134,6 +137,8 @@
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.4/jspdf.plugin.autotable.min.js"></script>
 <script type="module" src="/src/app.js"></script>
 </body>
 </html>
