@@ -318,8 +318,9 @@ async function cargarTabla(tabla, cfg) {
                     var props = f.properties || {};
                     var estado = props.estado || 'pendiente';
                     var colorEstado = '#92400e';
-                    if (estado === 'resuelto') colorEstado = '#3f6212';
-                    else if (estado === 'en_revision') colorEstado = '#b45309';
+                    if (estado === 'resuelto' || estado === 'completado') colorEstado = '#3f6212';
+                    else if (estado === 'en_revision' || estado === 'trabajando') colorEstado = '#0369a1';
+                    else if (estado === 'dependiente') colorEstado = '#b45309';
                     else if (estado === 'rechazado') colorEstado = '#57534e';
 
                     return L.circleMarker(ll, {
@@ -373,9 +374,68 @@ function mostrarInfoPanel(props, tabla, cfg) {
         var val = props[k];
         if (val === null || val === undefined || val === '') return;
         var label = (cfg.camposLabels && cfg.camposLabels[k]) || k;
-        panelHtml += '<div class="info-row"><span class="info-label">' + label + '</span><span class="info-value">' + val + '</span></div>';
+        if (k === 'estado' && tabla === 'reportes_ciudadanos') {
+            var estadosOpciones = [
+                { valor: 'pendiente', label: 'Pendiente', color: '#92400e' },
+                { valor: 'dependiente', label: 'Dependiente', color: '#b45309' },
+                { valor: 'trabajando', label: 'Trabajando', color: '#0369a1' },
+                { valor: 'completado', label: 'Completado', color: '#3f6212' }
+            ];
+            panelHtml += '<div class="info-row"><span class="info-label">' + label + '</span><span class="info-value">' + val + '</span></div>';
+            panelHtml += '<div class="estado-changer">';
+            panelHtml += '<div class="estado-changer-title">Cambiar estado:</div>';
+            panelHtml += '<div class="estado-buttons">';
+            estadosOpciones.forEach(function(est) {
+                var activo = (val === est.valor);
+                panelHtml += '<button class="estado-btn' + (activo ? ' activo' : '') + '" '
+                    + 'style="background:' + est.color + (activo ? ';box-shadow:0 0 8px ' + est.color : '') + '" '
+                    + 'data-id="' + props.id + '" data-estado="' + est.valor + '" '
+                    + 'onclick="cambiarEstado(' + props.id + ', \'' + est.valor + '\')">'
+                    + est.label + '</button>';
+            });
+            panelHtml += '</div></div>';
+        } else if (k !== 'estado') {
+            panelHtml += '<div class="info-row"><span class="info-label">' + label + '</span><span class="info-value">' + val + '</span></div>';
+        }
     });
     document.getElementById('info-panel').innerHTML = panelHtml;
+}
+
+async function cambiarEstado(id, nuevoEstado) {
+    if (!SUPABASE_URL || !SUPABASE_KEY) return;
+
+    var btns = document.querySelectorAll('.estado-btn');
+    btns.forEach(function(b) { b.disabled = true; b.style.opacity = '0.5'; });
+
+    try {
+        var r = await fetch(SUPABASE_URL + '/reportes_ciudadanos?id=eq.' + id, {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json',
+                apikey: SUPABASE_KEY,
+                Authorization: 'Bearer ' + SUPABASE_KEY,
+                Prefer: 'return=minimal'
+            },
+            body: JSON.stringify({ estado: nuevoEstado })
+        });
+
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+
+        status('Estado actualizado a "' + nuevoEstado + '" para reporte #' + id);
+
+        if (capasCargadas['reportes_ciudadanos']) {
+            map.removeLayer(capasCargadas['reportes_ciudadanos']);
+            delete capasCargadas['reportes_ciudadanos'];
+            var capa = await cargarTabla('reportes_ciudadanos', capasConfig['reportes_ciudadanos']);
+            if (capa) {
+                capa.addTo(map);
+                capasCargadas['reportes_ciudadanos'] = capa;
+            }
+        }
+    } catch(err) {
+        status('Error al actualizar estado: ' + err.message);
+        btns.forEach(function(b) { b.disabled = false; b.style.opacity = '1'; });
+    }
 }
 
 // ===== Generar PDF de Reportes =====
@@ -453,8 +513,9 @@ async function generarPDF() {
         // Estadisticas
         var total = reportes.length;
         var pendientes = reportes.filter(function(r) { return r.estado === 'pendiente'; }).length;
-        var revision = reportes.filter(function(r) { return r.estado === 'en_revision'; }).length;
-        var resueltos = reportes.filter(function(r) { return r.estado === 'resuelto'; }).length;
+        var dependientes = reportes.filter(function(r) { return r.estado === 'dependiente'; }).length;
+        var revision = reportes.filter(function(r) { return r.estado === 'en_revision' || r.estado === 'trabajando'; }).length;
+        var resueltos = reportes.filter(function(r) { return r.estado === 'resuelto' || r.estado === 'completado'; }).length;
         var rechazados = reportes.filter(function(r) { return r.estado === 'rechazado'; }).length;
 
         doc.setFillColor(30, 41, 59);
@@ -472,9 +533,10 @@ async function generarPDF() {
 
         doc.text('Total de reportes: ' + total, col1, yStat);
         doc.text('Pendientes: ' + pendientes, col2, yStat);
-        doc.text('En revision: ' + revision, col1, yStat + 8);
-        doc.text('Resueltos: ' + resueltos, col2, yStat + 8);
-        doc.text('Rechazados: ' + rechazados, col1, yStat + 16);
+        doc.text('Dependientes: ' + dependientes, col1, yStat + 8);
+        doc.text('En revision/Trabajando: ' + revision, col2, yStat + 8);
+        doc.text('Resueltos/Completados: ' + resueltos, col1, yStat + 16);
+        doc.text('Rechazados: ' + rechazados, col2, yStat + 16);
 
         // ===== Pagina 2: Tabla de reportes =====
         doc.addPage();
@@ -507,8 +569,11 @@ async function generarPDF() {
 
         var estadosLabel = {
             pendiente: 'Pendiente',
+            dependiente: 'Dependiente',
             en_revision: 'En revision',
+            trabajando: 'Trabajando',
             resuelto: 'Resuelto',
+            completado: 'Completado',
             rechazado: 'Rechazado'
         };
 
@@ -597,6 +662,7 @@ async function generarPDF() {
 window.toggleLayer = toggleLayer;
 window.cargarTodasLasCapas = cargarTodasLasCapas;
 window.generarPDF = generarPDF;
+window.cambiarEstado = cambiarEstado;
 
 // ===== Inicializacion =====
 

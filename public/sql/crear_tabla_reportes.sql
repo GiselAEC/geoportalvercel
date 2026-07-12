@@ -19,8 +19,9 @@ ALTER TABLE public.reportes_ciudadanos ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "reportes_select" ON public.reportes_ciudadanos FOR SELECT USING (true);
 CREATE POLICY "reportes_insert" ON public.reportes_ciudadanos FOR INSERT WITH CHECK (true);
-CREATE POLICY "reportes_update" ON public.reportes_ciudadanos FOR UPDATE USING (auth.role() = 'service_role');
+CREATE POLICY "reportes_update" ON public.reportes_ciudadanos FOR UPDATE USING (true);
 CREATE POLICY "reportes_delete" ON public.reportes_ciudadanos FOR DELETE USING (auth.role() = 'service_role');
 
 GRANT SELECT ON public.reportes_ciudadanos TO anon;
 GRANT INSERT ON public.reportes_ciudadanos TO anon;
+GRANT UPDATE ON public.reportes_ciudadanos TO anon;
