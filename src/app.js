@@ -588,6 +588,12 @@ async function generarPDF() {
     showLoading(false);
 }
 
+// ===== Exponer funciones al scope global (para onclick del HTML) =====
+
+window.toggleLayer = toggleLayer;
+window.cargarTodasLasCapas = cargarTodasLasCapas;
+window.generarPDF = generarPDF;
+
 // ===== Inicializacion =====
 
 window.addEventListener('load', function() {

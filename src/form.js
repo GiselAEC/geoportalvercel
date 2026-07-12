@@ -197,6 +197,11 @@ async function enviarReporte() {
     showLoading(false);
 }
 
+// ===== Exponer funciones al scope global =====
+
+window.enviarReporte = enviarReporte;
+window.actualizarMarkerManual = actualizarMarkerManual;
+
 function limpiarFormulario() {
     document.getElementById('tipo_problema').value = '';
     document.getElementById('comentario').value = '';
