@@ -381,7 +381,12 @@ function mostrarInfoPanel(props, tabla, cfg) {
                 { valor: 'trabajando', label: 'Trabajando', color: '#0369a1' },
                 { valor: 'completado', label: 'Completado', color: '#3f6212' }
             ];
-            panelHtml += '<div class="info-row"><span class="info-label">' + label + '</span><span class="info-value">' + val + '</span></div>';
+            var estadosDisplay = {
+                pendiente: 'Pendiente', dependiente: 'Dependiente',
+                trabajando: 'Trabajando', completado: 'Completado',
+                en_revision: 'En Revision', resuelto: 'Resuelto', rechazado: 'Rechazado'
+            };
+            panelHtml += '<div class="info-row"><span class="info-label">' + label + '</span><span class="info-value">' + (estadosDisplay[val] || val) + '</span></div>';
             panelHtml += '<div class="estado-changer">';
             panelHtml += '<div class="estado-changer-title">Cambiar estado:</div>';
             panelHtml += '<div class="estado-buttons">';
