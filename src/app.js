@@ -352,6 +352,13 @@ async function cargarTabla(tabla, cfg) {
 
 // ===== Popups e info =====
 
+function formatFecha(raw) {
+    if (!raw) return '';
+    var d = new Date(raw);
+    var pad = function(n) { return n < 10 ? '0' + n : n; };
+    return d.getFullYear() + '/' + pad(d.getMonth() + 1) + '/' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
+}
+
 function construirPopup(props, tabla, cfg) {
     var html = '<div class="popup-title">' + cfg.nombre + '</div>';
     var campos = cfg.camposPopup || Object.keys(props);
@@ -360,6 +367,7 @@ function construirPopup(props, tabla, cfg) {
         var val = props[k];
         if (val === null || val === undefined || val === '') return;
         var label = (cfg.camposLabels && cfg.camposLabels[k]) || k;
+        if (k === 'fecha' && tabla === 'reportes_ciudadanos') val = formatFecha(val);
         html += '<div class="popup-row"><span class="popup-key">' + label + ':</span><span class="popup-val">' + val + '</span></div>';
     });
     return html;
@@ -373,6 +381,7 @@ function mostrarInfoPanel(props, tabla, cfg) {
         var val = props[k];
         if (val === null || val === undefined || val === '') return;
         var label = (cfg.camposLabels && cfg.camposLabels[k]) || k;
+        if (k === 'fecha' && tabla === 'reportes_ciudadanos') val = formatFecha(val);
         panelHtml += '<div class="info-row"><span class="info-label">' + label + '</span><span class="info-value">' + val + '</span></div>';
     });
     document.getElementById('info-panel').innerHTML = panelHtml;
@@ -516,7 +525,8 @@ async function generarPDF() {
             var fecha = '';
             if (rep.fecha) {
                 var f = new Date(rep.fecha);
-                fecha = f.toLocaleDateString('es-EC') + ' ' + f.toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit' });
+                var pad = function(n) { return n < 10 ? '0' + n : n; };
+                fecha = f.getFullYear() + '/' + pad(f.getMonth() + 1) + '/' + pad(f.getDate()) + ' ' + pad(f.getHours()) + ':' + pad(f.getMinutes()) + ':' + pad(f.getSeconds());
             }
             var lat = '';
             var lng = '';
