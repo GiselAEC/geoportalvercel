@@ -370,6 +370,7 @@ function mostrarInfoPanel(props, tabla, cfg) {
     var panelHtml = '<div class="popup-title" style="font-size:12px;">' + cfg.nombre + '</div>';
     Object.keys(props).forEach(function(k) {
         if (['geom','geometry','geojson'].indexOf(k) !== -1) return;
+        if (k === 'estado' && tabla === 'reportes_ciudadanos') return;
         var val = props[k];
         if (val === null || val === undefined || val === '') return;
         var label = (cfg.camposLabels && cfg.camposLabels[k]) || k;
