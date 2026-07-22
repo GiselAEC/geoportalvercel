@@ -28,6 +28,7 @@ const capasConfig = {
 
 let capasActivas = {};
 let capasCargadas = {};
+let datosGeoJSON = {};
 let datosGeologia = { lahares: [], fallas: [] };
 let modoAnalisis = false;
 
@@ -38,10 +39,15 @@ function toggleLayer(nombre) {
     if (capasActivas[nombre]) {
         delete capasActivas[nombre]; toggle.classList.remove('on');
         document.querySelector('.layer-card[data-layer="'+nombre+'"]').classList.remove('active');
-        if (capasCargadas[nombre]) { map.removeLayer(capasCargadas[nombre]); delete capasCargadas[nombre]; }
+        if (capasCargadas[nombre]) { map.removeLayer(capasCargadas[nombre]); }
     } else {
         capasActivas[nombre] = true; toggle.classList.add('on');
         document.querySelector('.layer-card[data-layer="'+nombre+'"]').classList.add('active');
+        if (datosGeoJSON[nombre] && !capasCargadas[nombre]) {
+            var cfg = capasConfig[nombre];
+            var capa = construirCapaLeaflet(datosGeoJSON[nombre], nombre, cfg);
+            if (capa) { capa.addTo(map); capasCargadas[nombre] = capa; }
+        }
     }
 }
 
@@ -183,11 +189,15 @@ async function cargarTodasLasCapas() {
         document.getElementById('loading-bar').style.width = ((i+1)/orden.length*100)+'%';
 
         try {
-            var capa = await cargarTabla(tabla, cfg);
-            if (capa) {
-                capa.addTo(map); capasCargadas[tabla] = capa;
-                capa.eachLayer(function(l){if(l.getBounds){try{bounds.extend(l.getBounds());}catch(_){}}else if(l.getLatLng){bounds.extend(l.getLatLng());}});
-                cargadas++;
+            var features = await cargarDatosTabla(tabla);
+            if (features && features.length > 0) {
+                datosGeoJSON[tabla] = features;
+                var capa = construirCapaLeaflet(features, tabla, cfg);
+                if (capa) {
+                    capa.addTo(map); capasCargadas[tabla] = capa;
+                    capa.eachLayer(function(l){if(l.getBounds){try{bounds.extend(l.getBounds());}catch(_){}}else if(l.getLatLng){bounds.extend(l.getLatLng());}});
+                    cargadas++;
+                }
             }
         } catch(err) { console.warn('Error '+tabla+': '+err.message); }
     }
@@ -224,11 +234,11 @@ async function cargarDatosGeologia() {
     } catch(err) { console.warn('Error geologia: '+err.message); }
 }
 
-async function cargarTabla(tabla, cfg) {
+async function cargarDatosTabla(tabla) {
     var r = await fetch(SUPABASE_URL+'/'+tabla+'?select=*&limit=5000', {headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY}});
-    if (!r.ok) return null;
+    if (!r.ok) return [];
     var datos = await r.json();
-    if (!Array.isArray(datos) || datos.length === 0) return null;
+    if (!Array.isArray(datos) || datos.length === 0) return [];
 
     var features = [];
     datos.forEach(function(reg){
@@ -236,7 +246,11 @@ async function cargarTabla(tabla, cfg) {
         if(typeof geom==='string'){try{geom=JSON.parse(geom);}catch(_){}}
         if(geom&&geom.type&&geom.coordinates) features.push({type:'Feature',properties:reg,geometry:geom});
     });
-    if (features.length === 0) return null;
+    return features;
+}
+
+function construirCapaLeaflet(features, tabla, cfg) {
+    if (!features || features.length === 0) return null;
 
     var isLine=features[0].geometry.type.includes('Line'), isPoly=features[0].geometry.type.includes('Polygon'), isReporte=(tabla==='reportes_ciudadanos');
     var style={};
