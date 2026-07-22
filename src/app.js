@@ -39,11 +39,11 @@ function toggleLayer(nombre) {
     if (capasActivas[nombre]) {
         delete capasActivas[nombre]; toggle.classList.remove('on');
         document.querySelector('.layer-card[data-layer="'+nombre+'"]').classList.remove('active');
-        if (capasCargadas[nombre]) { map.removeLayer(capasCargadas[nombre]); }
+        if (capasCargadas[nombre]) { map.removeLayer(capasCargadas[nombre]); delete capasCargadas[nombre]; }
     } else {
         capasActivas[nombre] = true; toggle.classList.add('on');
         document.querySelector('.layer-card[data-layer="'+nombre+'"]').classList.add('active');
-        if (datosGeoJSON[nombre] && !capasCargadas[nombre]) {
+        if (datosGeoJSON[nombre]) {
             var cfg = capasConfig[nombre];
             var capa = construirCapaLeaflet(datosGeoJSON[nombre], nombre, cfg);
             if (capa) { capa.addTo(map); capasCargadas[nombre] = capa; }
