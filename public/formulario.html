@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reportar Problema - Baños de Agua Santa</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+<link rel="stylesheet" href="/styles-form.css"/>
+</head>
+<body>
+
+<div id="loading-bar"></div>
+
+<div id="header">
+  <i class="fas fa-exclamation-triangle" style="font-size:20px;color:#ffc107;"></i>
+  <div>
+    <h1>Reportar un Problema</h1>
+    <div class="subtitle">Baños de Agua Santa — Administra tu ciudad</div>
+  </div>
+</div>
+
+<div id="main">
+
+  <div id="map"></div>
+
+  <div id="form-panel">
+    <div id="form-content">
+
+      <div class="form-section">
+        <div class="form-title">
+          <i class="fas fa-map-marker-alt"></i> Ubicacion del problema
+        </div>
+        <p class="form-hint">Haz clic en el mapa para ubicar el problema, o escribe las coordenadas manualmente.</p>
+        <div class="coord-row">
+          <div class="coord-field">
+            <label>Latitud</label>
+            <input id="lat" type="number" step="any" placeholder="-1.3928">
+          </div>
+          <div class="coord-field">
+            <label>Longitud</label>
+            <input id="lng" type="number" step="any" placeholder="-78.4364">
+          </div>
+        </div>
+        <div id="coord-status" class="coord-status">
+          <i class="fas fa-crosshairs"></i> Selecciona un punto en el mapa
+        </div>
+      </div>
+
+      <div class="form-section">
+        <div class="form-title">
+          <i class="fas fa-list-ul"></i> Tipo de problema
+        </div>
+        <select id="tipo_problema">
+          <option value="">-- Selecciona una opcion --</option>
+          <option value="bache_via">Bache en via</option>
+          <option value="alumbrado_deficiente">Alumbrado publico deficiente</option>
+          <option value="basura_acumulada">Basura acumulada / limpieza</option>
+          <option value="deslave">Deslave / derrumbe</option>
+          <option value="inundacion">Inundacion / anegamiento</option>
+          <option value="senalizacion">Falta de senalizacion</option>
+          <option value="acera_danada">Acera danada / peatonal</option>
+          <option value="arbol_caido">Arbol caido / rama peligrosa</option>
+          <option value="fuga_agua">Fuga de agua / alcantarillado</option>
+          <option value="peligro_volcanico">Peligro volcanico / lahar</option>
+          <option value="falla_geologica">Falla geologica visible</option>
+          <option value="vialidad_peligrosa">Vialidad peligrosa</option>
+          <option value="contaminacion">Contaminacion ambiental</option>
+          <option value="otro">Otro</option>
+        </select>
+      </div>
+
+      <div class="form-section">
+        <div class="form-title">
+          <i class="fas fa-comment-dots"></i> Descripcion del problema
+        </div>
+        <textarea id="comentario" rows="4" placeholder="Describe brevemente el problema que observas..."></textarea>
+      </div>
+
+      <div class="form-section">
+        <div class="form-title">
+          <i class="fas fa-user"></i> Datos de contacto <span class="optional">(opcional)</span>
+        </div>
+        <input id="nombre" type="text" placeholder="Tu nombre">
+        <input id="telefono" type="tel" placeholder="Tu telefono">
+      </div>
+
+      <button id="btn-enviar" class="btn-enviar" onclick="enviarReporte()">
+        <i class="fas fa-paper-plane"></i> Enviar Reporte
+      </button>
+
+      <div id="form-msg"></div>
+
+      <div class="form-footer">
+        <a href="/"><i class="fas fa-map"></i> Volver al Geoportal</a>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+(function(){
+var SUPABASE_URL = 'https://aqqhdmljrozgmrocmknv.supabase.co';
+var SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFxcWhkbWxqcm96Z21yb2Nta252Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE3Mzg0MzYsImV4cCI6MjA5NzMxNDQzNn0.JsBf2fTdwrTlH3r30bDamebFIn4ytb88EhueQn-fN9w';
+
+var map = L.map('map', { center: [-1.3928, -78.4364], zoom: 15, zoomControl: false });
+L.control.zoom({ position: 'topleft' }).addTo(map);
+L.tileLayer('https://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
+    attribution: '&copy; Google Hibrido', maxZoom: 20,
+    subdomains: ['mt0','mt1','mt2','mt3']
+}).addTo(map);
+
+var marker = null;
+
+function showLoading(show) {
+    var bar = document.getElementById('loading-bar');
+    if (show) { bar.style.width='30%'; bar.classList.add('visible'); }
+    else { bar.style.width='100%'; setTimeout(function(){bar.classList.remove('visible');bar.style.width='0';},400); }
+}
+
+function formMsg(msg, type) {
+    var el = document.getElementById('form-msg');
+    el.className = 'form-msg ' + type;
+    el.innerHTML = msg;
+}
+
+map.on('click', function(e) {
+    var lat = e.latlng.lat, lng = e.latlng.lng;
+    document.getElementById('lat').value = lat.toFixed(6);
+    document.getElementById('lng').value = lng.toFixed(6);
+    if (marker) map.removeLayer(marker);
+    marker = L.marker([lat, lng], {
+        icon: L.divIcon({ className:'custom-marker', html:'<div class="marker-pin"></div>', iconSize:[30,42], iconAnchor:[15,42] })
+    }).addTo(map);
+    var st = document.getElementById('coord-status');
+    st.innerHTML = '<i class="fas fa-check-circle"></i> Punto seleccionado: ' + lat.toFixed(6) + ', ' + lng.toFixed(6);
+    st.className = 'coord-status ok';
+});
+
+document.getElementById('lat').addEventListener('input', actualizarMarkerManual);
+document.getElementById('lng').addEventListener('input', actualizarMarkerManual);
+
+function actualizarMarkerManual() {
+    var lat = parseFloat(document.getElementById('lat').value);
+    var lng = parseFloat(document.getElementById('lng').value);
+    if (isNaN(lat) || isNaN(lng)) return;
+    if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return;
+    if (marker) map.removeLayer(marker);
+    marker = L.marker([lat, lng], {
+        icon: L.divIcon({ className:'custom-marker', html:'<div class="marker-pin"></div>', iconSize:[30,42], iconAnchor:[15,42] })
+    }).addTo(map);
+    map.setView([lat, lng], 16);
+    var st = document.getElementById('coord-status');
+    st.innerHTML = '<i class="fas fa-check-circle"></i> Coordenadas ingresadas: ' + lat.toFixed(6) + ', ' + lng.toFixed(6);
+    st.className = 'coord-status ok';
+}
+window.actualizarMarkerManual = actualizarMarkerManual;
+
+async function enviarReporte() {
+    var lat = parseFloat(document.getElementById('lat').value);
+    var lng = parseFloat(document.getElementById('lng').value);
+    var tipo = document.getElementById('tipo_problema').value;
+    var comentario = document.getElementById('comentario').value.trim();
+    var nombre = document.getElementById('nombre').value.trim();
+    var telefono = document.getElementById('telefono').value.trim();
+
+    if (isNaN(lat) || isNaN(lng)) { formMsg('Debes seleccionar una ubicacion en el mapa.', 'error'); return; }
+    if (!tipo) { formMsg('Debes seleccionar un tipo de problema.', 'error'); return; }
+
+    var btn = document.getElementById('btn-enviar');
+    btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enviando...'; showLoading(true);
+
+    var geomGeoJSON = { type:'Point', coordinates:[lng, lat] };
+    var enviado = false;
+
+    try {
+        var r = await fetch(SUPABASE_URL + '/rpc/insertar_reporte', {
+            method:'POST', headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY,'Content-Type':'application/json'},
+            body: JSON.stringify({p_tipo_problema:tipo,p_comentario:comentario||null,p_nombre:nombre||null,p_telefono:telefono||null,p_latitud:lat,p_longitud:lng})
+        });
+        if (r.ok) { var result = await r.json(); if(result&&result.success){formMsg('<i class="fas fa-check-circle"></i> <b>Reporte enviado!</b><br>Numero: <b>#'+result.id+'</b>','success');enviado=true;limpiarFormulario();} }
+    } catch(_){}
+
+    if (!enviado) {
+        try {
+            var r2 = await fetch(SUPABASE_URL + '/reportes_ciudadanos', {
+                method:'POST', headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY,'Content-Type':'application/json',Prefer:'return=representation'},
+                body: JSON.stringify({tipo_problema:tipo,comentario:comentario||null,nombre:nombre||null,telefono:telefono||null,geom:geomGeoJSON})
+            });
+            if (r2.ok) { var rows = await r2.json(); var id=(rows&&rows[0])?rows[0].id:'?'; formMsg('<i class="fas fa-check-circle"></i> <b>Reporte enviado!</b><br>Numero: <b>#'+id+'</b>','success'); limpiarFormulario(); }
+            else { formMsg('Error al enviar. Verifica que la tabla exista en Supabase.', 'error'); }
+        } catch(err2) { formMsg('Error de conexion. Verifica tu internet.', 'error'); }
+    }
+
+    btn.disabled = false; btn.innerHTML = '<i class="fas fa-paper-plane"></i> Enviar Reporte'; showLoading(false);
+}
+window.enviarReporte = enviarReporte;
+
+function limpiarFormulario() {
+    document.getElementById('tipo_problema').value = '';
+    document.getElementById('comentario').value = '';
+    document.getElementById('nombre').value = '';
+    document.getElementById('telefono').value = '';
+    document.getElementById('lat').value = '';
+    document.getElementById('lng').value = '';
+    if (marker) { map.removeLayer(marker); marker = null; }
+    var st = document.getElementById('coord-status');
+    st.innerHTML = '<i class="fas fa-crosshairs"></i> Selecciona un punto en el mapa';
+    st.className = 'coord-status';
+}
+})();
+</script>
+</body>
+</html>
