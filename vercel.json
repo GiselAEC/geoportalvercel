@@ -1,8 +1,7 @@
 {
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
-  "framework": "vite",
   "rewrites": [
-    { "source": "/formulario.html", "destination": "/formulario.html" }
+    { "source": "/((?!formulario.html).*)", "destination": "/index.html" }
   ]
 }
