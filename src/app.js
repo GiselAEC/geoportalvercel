@@ -324,8 +324,9 @@ function limpiarAnalisis() {
 function handlerAnalisisClick(e) {
     if (!modoAnalisis) return;
     e.stopPropagation();
-    var point = map.containerPointToLatLng([e.offsetX, e.offsetY]);
-    onMapaClickAnalisis({ latlng: point });
+    var point = map.mouseEventToContainerPoint(e);
+    var latlng = map.containerPointToLatLng(point);
+    onMapaClickAnalisis({ latlng: latlng });
 }
 
 async function onMapaClickAnalisis(e) {
