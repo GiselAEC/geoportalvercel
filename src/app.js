@@ -1,4 +1,4 @@
-// app.js v2.0 — Geoportal Banos (Vercel + env vars + Mapa de Riesgo)
+// app.js v2.1 — Geoportal Banos (Riesgo client-side + capas integradas)
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_KEY;
@@ -84,6 +84,10 @@ const capasConfig = {
         camposPopup: ['id','tipo_problema','comentario','nombre','telefono','fecha'],
         camposLabels: { id:'Numero', tipo_problema:'Tipo de Problema', comentario:'Comentario', nombre:'Nombre', telefono:'Telefono', fecha:'Fecha' },
         orden: 6
+    },
+    zonas_riesgo: {
+        nombre: 'Zonas de Riesgo',
+        orden: 7
     }
 };
 
@@ -91,15 +95,14 @@ const capasConfig = {
 
 let capasActivas = {};
 let capasCargadas = {};
-let modoRiesgo = false;
-let capasRiesgo = [];
+let datosGeologia = { lahares: [], fallas: [] };
 let modoAnalisis = false;
 let marcadorAnalisis = null;
 
 // ===== Funciones de UI =====
 
 function toggleLayer(nombre) {
-    const toggle = document.getElementById('toggle-' + nombre);
+    var toggle = document.getElementById('toggle-' + nombre);
     if (capasActivas[nombre]) {
         delete capasActivas[nombre];
         toggle.classList.remove('on');
@@ -128,7 +131,149 @@ function showLoading(show) {
     }
 }
 
-// ===== Carga de capas =====
+// ======================================================================
+// ===== GEOMETRIA CLIENT-SIDE =====
+// ======================================================================
+
+function pointInRing(point, ring) {
+    var x = point[0], y = point[1];
+    var inside = false;
+    for (var i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+        var xi = ring[i][0], yi = ring[i][1];
+        var xj = ring[j][0], yj = ring[j][1];
+        if (((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi)) {
+            inside = !inside;
+        }
+    }
+    return inside;
+}
+
+function pointInPolygon(point, polygon) {
+    if (polygon.length === 0) return false;
+    if (!pointInRing(point, polygon[0])) return false;
+    for (var i = 1; i < polygon.length; i++) {
+        if (pointInRing(point, polygon[i])) return false;
+    }
+    return true;
+}
+
+function pointInGeom(point, geom) {
+    if (!geom || !geom.type || !geom.coordinates) return false;
+    if (geom.type === 'Polygon') {
+        return pointInPolygon(point, geom.coordinates);
+    }
+    if (geom.type === 'MultiPolygon') {
+        for (var i = 0; i < geom.coordinates.length; i++) {
+            if (pointInPolygon(point, geom.coordinates[i])) return true;
+        }
+        return false;
+    }
+    return false;
+}
+
+function distToSegment(px, py, ax, ay, bx, by) {
+    var dx = bx - ax, dy = by - ay;
+    var lenSq = dx * dx + dy * dy;
+    if (lenSq === 0) return Math.sqrt((px-ax)*(px-ax) + (py-ay)*(py-ay));
+    var t = Math.max(0, Math.min(1, ((px-ax)*dx + (py-ay)*dy) / lenSq));
+    var projX = ax + t * dx, projY = ay + t * dy;
+    return Math.sqrt((px-projX)*(px-projX) + (py-projY)*(py-projY));
+}
+
+function distToLineString(point, coords) {
+    var minDist = Infinity;
+    for (var i = 0; i < coords.length - 1; i++) {
+        var d = distToSegment(point[0], point[1], coords[i][0], coords[i][1], coords[i+1][0], coords[i+1][1]);
+        if (d < minDist) minDist = d;
+    }
+    return minDist;
+}
+
+function distToGeom(point, geom) {
+    if (!geom || !geom.type || !geom.coordinates) return Infinity;
+    if (geom.type === 'LineString') {
+        return distToLineString(point, geom.coordinates);
+    }
+    if (geom.type === 'MultiLineString') {
+        var min = Infinity;
+        for (var i = 0; i < geom.coordinates.length; i++) {
+            var d = distToLineString(point, geom.coordinates[i]);
+            if (d < min) min = d;
+        }
+        return min;
+    }
+    return Infinity;
+}
+
+function gradosAMetros(g) { return g * 111320; }
+
+function analizarRiesgoPunto(lng, lat) {
+    var point = [lng, lat];
+    var dentroLahar = false;
+    var nombreLahar = '';
+    var distLahar = Infinity;
+
+    for (var i = 0; i < datosGeologia.lahares.length; i++) {
+        var l = datosGeologia.lahares[i];
+        if (pointInGeom(point, l.geom)) {
+            dentroLahar = true;
+            nombreLahar = l.descrip || l.volcan || 'Lahar';
+            distLahar = 0;
+            break;
+        }
+    }
+
+    if (!dentroLahar) {
+        for (var i = 0; i < datosGeologia.lahares.length; i++) {
+            var l = datosGeologia.lahares[i];
+            var ringCoords = null;
+            if (l.geom.type === 'Polygon') ringCoords = l.geom.coordinates[0];
+            else if (l.geom.type === 'MultiPolygon' && l.geom.coordinates.length > 0) ringCoords = l.geom.coordinates[0][0];
+            if (ringCoords) {
+                var minD = Infinity;
+                for (var j = 0; j < ringCoords.length - 1; j++) {
+                    var d = distToSegment(lng, lat, ringCoords[j][0], ringCoords[j][1], ringCoords[j+1][0], ringCoords[j+1][1]);
+                    if (d < minD) minD = d;
+                }
+                if (minD < distLahar) { distLahar = minD; nombreLahar = l.descrip || ''; }
+            }
+        }
+        distLahar = gradosAMetros(distLahar);
+    }
+
+    var nombreFalla = '';
+    var tipoFalla = '';
+    var distFalla = Infinity;
+
+    for (var i = 0; i < datosGeologia.fallas.length; i++) {
+        var f = datosGeologia.fallas[i];
+        var d = distToGeom(point, f.geom);
+        if (d < distFalla) {
+            distFalla = d;
+            nombreFalla = f.nam || '';
+            tipoFalla = f.tfll || '';
+        }
+    }
+    distFalla = gradosAMetros(distFalla);
+
+    var nivel = 'BAJO';
+    if (dentroLahar || distLahar < 500) nivel = 'ALTO';
+    else if (distLahar < 1500 || distFalla < 200) nivel = 'MEDIO';
+
+    return {
+        dentro_lahar: dentroLahar,
+        nombre_lahar: nombreLahar,
+        distancia_lahar_m: distLahar === Infinity ? null : Math.round(distLahar),
+        nombre_falla: nombreFalla,
+        tipo_falla: tipoFalla,
+        distancia_falla_m: distFalla === Infinity ? null : Math.round(distFalla),
+        nivel_riesgo: nivel
+    };
+}
+
+// ======================================================================
+// ===== CARGA DE CAPAS =====
+// ======================================================================
 
 async function cargarTodasLasCapas() {
     if (!SUPABASE_URL || !SUPABASE_KEY) { status('Error: Variables de entorno no configuradas'); return; }
@@ -150,8 +295,23 @@ async function cargarTodasLasCapas() {
     for (var i = 0; i < orden.length; i++) {
         var tabla = orden[i];
         var cfg = capasConfig[tabla];
-        status('Cargando ' + cfg.nombre + ' (' + (i + 1) + '/' + orden.length + ')...');
-        document.getElementById('loading-bar').style.width = ((i + 1) / orden.length * 100) + '%';
+
+        if (tabla === 'zonas_riesgo') {
+            status('Cargando Zonas de Riesgo (' + (i+1) + '/' + orden.length + ')...');
+            document.getElementById('loading-bar').style.width = ((i+1)/orden.length*100)+'%';
+            try {
+                var capa = await cargarZonasRiesgo();
+                if (capa) {
+                    capa.addTo(map);
+                    capasCargadas['zonas_riesgo'] = capa;
+                    cargadas++;
+                }
+            } catch(err) { console.warn('Error cargando zonas de riesgo: ' + err.message); }
+            continue;
+        }
+
+        status('Cargando ' + cfg.nombre + ' (' + (i+1) + '/' + orden.length + ')...');
+        document.getElementById('loading-bar').style.width = ((i+1)/orden.length*100)+'%';
 
         try {
             var capa = await cargarTabla(tabla, cfg);
@@ -174,6 +334,42 @@ async function cargarTodasLasCapas() {
     btn.innerHTML = '<i class="fas fa-check"></i> Capas Cargadas (' + cargadas + ')';
     showLoading(false);
     status(cargadas + ' capa(s) cargada(s) correctamente');
+}
+
+async function cargarDatosGeologia() {
+    if (datosGeologia.lahares.length > 0 && datosGeologia.fallas.length > 0) return;
+
+    try {
+        var rL = await fetch(SUPABASE_URL + '/laharestungurahua?select=*&limit=5000', {
+            headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+        });
+        if (rL.ok) {
+            var lahares = await rL.json();
+            if (Array.isArray(lahares)) {
+                datosGeologia.lahares = lahares.filter(function(r) {
+                    var g = r.geom || r.geometry || r.geojson;
+                    if (typeof g === 'string') { try { g = JSON.parse(g); } catch(_) {} }
+                    if (g && g.type && g.coordinates) { r.geom = g; return true; }
+                    return false;
+                });
+            }
+        }
+
+        var rF = await fetch(SUPABASE_URL + '/fallasbanos?select=*&limit=5000', {
+            headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
+        });
+        if (rF.ok) {
+            var fallas = await rF.json();
+            if (Array.isArray(fallas)) {
+                datosGeologia.fallas = fallas.filter(function(r) {
+                    var g = r.geom || r.geometry || r.geojson;
+                    if (typeof g === 'string') { try { g = JSON.parse(g); } catch(_) {} }
+                    if (g && g.type && g.coordinates) { r.geom = g; return true; }
+                    return false;
+                });
+            }
+        }
+    } catch(err) { console.warn('Error cargando geologia: ' + err.message); }
 }
 
 async function cargarTabla(tabla, cfg) {
@@ -209,7 +405,7 @@ async function cargarTabla(tabla, cfg) {
         if (cfg.dashArray) style.dashArray = cfg.dashArray;
     }
 
-    var geojson = L.geoJSON(
+    return L.geoJSON(
         { type: 'FeatureCollection', features: features },
         {
             style: function() { return style; },
@@ -226,18 +422,127 @@ async function cargarTabla(tabla, cfg) {
                 return L.circleMarker(ll, { radius: 5, fillColor: cfg.color, color: '#fff', weight: 1.5, fillOpacity: 0.85 });
             },
             onEachFeature: function(feature, layer) {
-                var popupHtml = construirPopup(feature.properties, tabla, cfg);
-                layer.bindPopup(popupHtml, { maxWidth: 320 });
-                layer.on('click', function() {
-                    mostrarInfoPanel(feature.properties, tabla, cfg);
-                });
+                layer.bindPopup(construirPopup(feature.properties, tabla, cfg), { maxWidth: 320 });
+                layer.on('click', function() { mostrarInfoPanel(feature.properties, tabla, cfg); });
             }
         }
     );
-    return geojson;
 }
 
-// ===== Popups e info =====
+// ======================================================================
+// ===== ZONAS DE RIESGO (capa) =====
+// ======================================================================
+
+async function cargarZonasRiesgo() {
+    await cargarDatosGeologia();
+
+    var capasCombo = L.layerGroup();
+
+    // Lahares = Alto riesgo (rojo)
+    if (datosGeologia.lahares.length > 0) {
+        var fLahares = datosGeologia.lahares.map(function(r) {
+            return { type: 'Feature', properties: { tipo: 'alto', desc: r.descrip || 'Zona de lahar', volcan: r.volcan || 'Tungurahua' }, geometry: r.geom };
+        });
+        var capaLahares = L.geoJSON(
+            { type: 'FeatureCollection', features: fLahares },
+            {
+                style: function() { return { color: '#dc2626', fillColor: '#ef4444', fillOpacity: 0.35, weight: 2 }; },
+                onEachFeature: function(feature, layer) {
+                    layer.bindPopup(
+                        '<div class="popup-title" style="color:#dc2626;">Riesgo ALTO</div>' +
+                        '<div class="popup-row"><span class="popup-key">Tipo:</span><span class="popup-val">Zona de Lahar</span></div>' +
+                        '<div class="popup-row"><span class="popup-key">Descripcion:</span><span class="popup-val">' + feature.properties.desc + '</span></div>'
+                    );
+                }
+            }
+        );
+        capaLahares.addTo(capasCombo);
+    }
+
+    // Buffers alrededor de fallas
+    if (datosGeologia.fallas.length > 0) {
+        // Zona media (~200m = ~0.0018 grados)
+        var fMedia = [];
+        datosGeologia.fallas.forEach(function(f) {
+            var coords = extraerCoordsLine(f.geom);
+            if (coords) {
+                coords.forEach(function(line) {
+                    var ring = [];
+                    var pasos = 20;
+                    for (var i = 0; i < line.length; i++) {
+                        var lng = line[i][0], lat = line[i][1];
+                        for (var s = 0; s <= pasos; s++) {
+                            var angle = (s / pasos) * 2 * Math.PI;
+                            ring.push([lng + 0.0018 * Math.cos(angle), lat + 0.0018 * Math.sin(angle)]);
+                        }
+                    }
+                    if (ring.length > 2) {
+                        fMedia.push({ type: 'Feature', properties: { tipo: 'medio' }, geometry: { type: 'Polygon', coordinates: [ring] } });
+                    }
+                });
+            }
+        });
+        if (fMedia.length > 0) {
+            var capaMedia = L.geoJSON(
+                { type: 'FeatureCollection', features: fMedia },
+                {
+                    style: function() { return { color: '#f97316', fillColor: '#fb923c', fillOpacity: 0.15, weight: 1 }; },
+                    onEachFeature: function() {
+                        this.bindPopup('<div class="popup-title" style="color:#f97316;">Riesgo MEDIO</div><div class="popup-row"><span class="popup-val">Radio ~200m de falla geologica</span></div>');
+                    }
+                }
+            );
+            capaMedia.addTo(capasCombo);
+        }
+
+        // Zona baja (~500m = ~0.0045 grados)
+        var fBaja = [];
+        datosGeologia.fallas.forEach(function(f) {
+            var coords = extraerCoordsLine(f.geom);
+            if (coords) {
+                coords.forEach(function(line) {
+                    var ring = [];
+                    var pasos = 16;
+                    for (var i = 0; i < line.length; i++) {
+                        var lng = line[i][0], lat = line[i][1];
+                        for (var s = 0; s <= pasos; s++) {
+                            var angle = (s / pasos) * 2 * Math.PI;
+                            ring.push([lng + 0.0045 * Math.cos(angle), lat + 0.0045 * Math.sin(angle)]);
+                        }
+                    }
+                    if (ring.length > 2) {
+                        fBaja.push({ type: 'Feature', properties: { tipo: 'bajo' }, geometry: { type: 'Polygon', coordinates: [ring] } });
+                    }
+                });
+            }
+        });
+        if (fBaja.length > 0) {
+            var capaBaja = L.geoJSON(
+                { type: 'FeatureCollection', features: fBaja },
+                {
+                    style: function() { return { color: '#22c55e', fillColor: '#4ade80', fillOpacity: 0.1, weight: 1 }; },
+                    onEachFeature: function() {
+                        this.bindPopup('<div class="popup-title" style="color:#22c55e;">Riesgo BAJO</div><div class="popup-row"><span class="popup-val">Radio ~500m de falla geologica</span></div>');
+                    }
+                }
+            );
+            capaBaja.addTo(capasCombo);
+        }
+    }
+
+    return capasCombo;
+}
+
+function extraerCoordsLine(geom) {
+    if (!geom || !geom.coordinates) return null;
+    if (geom.type === 'LineString') return [geom.coordinates];
+    if (geom.type === 'MultiLineString') return geom.coordinates;
+    return null;
+}
+
+// ======================================================================
+// ===== POPUPS E INFO =====
+// ======================================================================
 
 function formatFecha(raw) {
     if (!raw) return '';
@@ -274,203 +579,11 @@ function mostrarInfoPanel(props, tabla, cfg) {
 }
 
 // ======================================================================
-// ===== MAPA DE RIESGO =====
-// ======================================================================
-
-async function activarMapaRiesgo() {
-    if (!SUPABASE_URL || !SUPABASE_KEY) { status('Error: Variables de entorno no configuradas'); return; }
-
-    if (modoRiesgo) {
-        desactivarMapaRiesgo();
-        return;
-    }
-
-    var btn = document.getElementById('btn-riesgo');
-    btn.disabled = true;
-    showLoading(true);
-    status('Cargando Mapa de Riesgo...');
-
-    limpiarAnalisis();
-
-    try {
-        var rLahar = await fetch(SUPABASE_URL + '/laharestungurahua?select=*&limit=5000', {
-            headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
-        });
-        var rFalla = await fetch(SUPABASE_URL + '/fallasbanos?select=*&limit=5000', {
-            headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
-        });
-
-        if (rLahar.ok) {
-            var lahares = await rLahar.json();
-            if (Array.isArray(lahares) && lahares.length > 0) {
-                var features = [];
-                lahares.forEach(function(reg) {
-                    var geom = reg.geom || reg.geometry || reg.geojson;
-                    if (typeof geom === 'string') { try { geom = JSON.parse(geom); } catch(_) {} }
-                    if (geom && geom.type && geom.coordinates) {
-                        features.push({ type: 'Feature', properties: reg, geometry: geom });
-                    }
-                });
-
-                var capaLahares = L.geoJSON(
-                    { type: 'FeatureCollection', features: features },
-                    {
-                        style: function() {
-                            return { color: '#dc2626', fillColor: '#ef4444', fillOpacity: 0.35, weight: 2 };
-                        },
-                        onEachFeature: function(feature, layer) {
-                            layer.bindPopup(
-                                '<div class="popup-title" style="color:#dc2626;">Zona de Riesgo ALTO</div>' +
-                                '<div class="popup-row"><span class="popup-key">Tipo:</span><span class="popup-val">Zona de Lahar</span></div>' +
-                                '<div class="popup-row"><span class="popup-key">Descripcion:</span><span class="popup-val">' + (feature.properties.descrip || 'N/A') + '</span></div>' +
-                                '<div class="popup-row"><span class="popup-key">Volcan:</span><span class="popup-val">' + (feature.properties.volcan || 'Tungurahua') + '</span></div>'
-                            );
-                        }
-                    }
-                );
-                capaLahares.addTo(map);
-                capasRiesgo.push(capaLahares);
-            }
-        }
-
-        if (rFalla.ok) {
-            var fallas = await rFalla.json();
-            if (Array.isArray(fallas) && fallas.length > 0) {
-                var featuresF = [];
-                fallas.forEach(function(reg) {
-                    var geom = reg.geom || reg.geometry || reg.geojson;
-                    if (typeof geom === 'string') { try { geom = JSON.parse(geom); } catch(_) {} }
-                    if (geom && geom.type && geom.coordinates) {
-                        featuresF.push({ type: 'Feature', properties: reg, geometry: geom });
-                    }
-                });
-
-                var capaFallas = L.geoJSON(
-                    { type: 'FeatureCollection', features: featuresF },
-                    {
-                        style: function() {
-                            return { color: '#f97316', weight: 4, dashArray: '10, 6' };
-                        },
-                        onEachFeature: function(feature, layer) {
-                            layer.bindPopup(
-                                '<div class="popup-title" style="color:#f97316;">Falla Geologica</div>' +
-                                '<div class="popup-row"><span class="popup-key">Nombre:</span><span class="popup-val">' + (feature.properties.nam || 'N/A') + '</span></div>' +
-                                '<div class="popup-row"><span class="popup-key">Tipo:</span><span class="popup-val">' + (feature.properties.tfll || 'N/A') + '</span></div>'
-                            );
-                        }
-                    }
-                );
-                capaFallas.addTo(map);
-                capasRiesgo.push(capaFallas);
-            }
-        }
-
-        // Buffer de riesgo alrededor de fallas (zona media = 200m, zona baja = 500m)
-        if (rFalla.ok) {
-            var fallasRaw = await fetch(SUPABASE_URL + '/fallasbanos?select=geom&limit=5000', {
-                headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }
-            });
-            if (fallasRaw.ok) {
-                var fallasGeo = await fallasRaw.json();
-                if (Array.isArray(fallasGeo) && fallasGeo.length > 0) {
-                    var bufferFeatures = [];
-                    fallasGeo.forEach(function(reg) {
-                        var geom = reg.geom;
-                        if (typeof geom === 'string') { try { geom = JSON.parse(geom); } catch(_) {} }
-                        if (geom && geom.type && geom.coordinates) {
-                            bufferFeatures.push({ type: 'Feature', properties: {}, geometry: geom });
-                        }
-                    });
-
-                    if (bufferFeatures.length > 0) {
-                        var bufMedio = crearBuffers(bufferFeatures, 0.002);
-                        if (bufMedio) {
-                            var capaMedia = L.geoJSON(bufMedio, {
-                                style: function() { return { color: '#f97316', fillColor: '#fb923c', fillOpacity: 0.12, weight: 1 }; }
-                            });
-                            capaMedia.bindPopup('<div class="popup-title" style="color:#f97316;">Zona de Riesgo MEDIO</div><div class="popup-row"><span class="popup-val">Radio ~200m de falla geologica</span></div>');
-                            capaMedia.addTo(map);
-                            capasRiesgo.push(capaMedia);
-                        }
-
-                        var bufBajo = crearBuffers(bufferFeatures, 0.005);
-                        if (bufBajo) {
-                            var capaBaja = L.geoJSON(bufBajo, {
-                                style: function() { return { color: '#22c55e', fillColor: '#4ade80', fillOpacity: 0.08, weight: 1 }; }
-                            });
-                            capaBaja.bindPopup('<div class="popup-title" style="color:#22c55e;">Zona de Riesgo BAJO</div><div class="popup-row"><span class="popup-val">Radio ~500m de falla geologica</span></div>');
-                            capaBaja.addTo(map);
-                            capasRiesgo.push(capaBaja);
-                        }
-                    }
-                }
-            }
-        }
-
-        modoRiesgo = true;
-        btn.innerHTML = '<i class="fas fa-times"></i> Cerrar Mapa de Riesgo';
-        btn.classList.add('activo');
-        status('Mapa de Riesgo activado — Alto (rojo), Medio (naranja), Bajo (verde)');
-
-    } catch(err) {
-        console.error('Error cargando riesgo:', err);
-        status('Error al cargar mapa de riesgo: ' + err.message);
-    }
-
-    btn.disabled = false;
-    showLoading(false);
-}
-
-function crearBuffers(features, radioGrados) {
-    var buffered = [];
-    features.forEach(function(f) {
-        if (!f.geometry || !f.geometry.coordinates) return;
-        var coords = f.geometry.type === 'MultiLineString' ? f.geometry.coordinates : [f.geometry.coordinates];
-        var ringPoints = [];
-        coords.forEach(function(line) {
-            line.forEach(function(pt) {
-                var lng = pt[0], lat = pt[1];
-                var steps = 16;
-                var ring = [];
-                for (var s = 0; s <= steps; s++) {
-                    var angle = (s / steps) * 2 * Math.PI;
-                    ring.push([lng + radioGrados * Math.cos(angle), lat + radioGrados * Math.sin(angle)]);
-                }
-                ringPoints.push({ type: 'Polygon', coordinates: [ring] });
-            });
-        });
-        if (ringPoints.length > 0) {
-            if (ringPoints.length === 1) {
-                buffered.push({ type: 'Feature', properties: {}, geometry: ringPoints[0] });
-            } else {
-                buffered.push({ type: 'Feature', properties: {}, geometry: { type: 'MultiPolygon', coordinates: ringPoints.map(function(p) { return p.coordinates; }) } });
-            }
-        }
-    });
-    if (buffered.length === 0) return null;
-    if (buffered.length === 1) return buffered[0];
-    return { type: 'FeatureCollection', features: buffered };
-}
-
-function desactivarMapaRiesgo() {
-    capasRiesgo.forEach(function(capa) { map.removeLayer(capa); });
-    capasRiesgo = [];
-    modoRiesgo = false;
-    var btn = document.getElementById('btn-riesgo');
-    btn.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Mapa de Riesgo';
-    btn.classList.remove('activo');
-    status('Mapa de Riesgo desactivado');
-}
-
-// ======================================================================
 // ===== ANALIZAR RIESGO POR DIRECCION =====
 // ======================================================================
 
 function activarAnalisis() {
-    if (modoAnalisis) {
-        limpiarAnalisis();
-        return;
-    }
+    if (modoAnalisis) { limpiarAnalisis(); return; }
 
     limpiarAnalisis();
     modoAnalisis = true;
@@ -491,10 +604,7 @@ function limpiarAnalisis() {
     map.getContainer().style.cursor = '';
     map.off('click', onMapaClickAnalisis);
     var btn = document.getElementById('btn-analisis');
-    if (btn) {
-        btn.innerHTML = '<i class="fas fa-search-location"></i> Analizar Riesgo';
-        btn.classList.remove('activo');
-    }
+    if (btn) { btn.innerHTML = '<i class="fas fa-search-location"></i> Analizar Riesgo'; btn.classList.remove('activo'); }
     var panel = document.getElementById('info-panel');
     if (panel) {
         panel.innerHTML = '<div style="font-size:11px;color:#888;text-align:center;padding:8px;">Haz clic en una feature del mapa para ver sus atributos</div>';
@@ -507,80 +617,55 @@ async function onMapaClickAnalisis(e) {
     var lat = e.latlng.lat;
     var lng = e.latlng.lng;
 
-    if (marcadorAnalisis) { map.removeLayer(marcadorAnalisis); }
+    if (marcadorAnalisis) map.removeLayer(marcadorAnalisis);
 
     marcadorAnalisis = L.circleMarker([lat, lng], {
         radius: 8, fillColor: '#3b82f6', color: '#fff', weight: 3, fillOpacity: 1
     }).addTo(map);
 
     map.off('click', onMapaClickAnalisis);
+    status('Analizando riesgo...');
 
-    status('Analizando riesgo en ' + lat.toFixed(6) + ', ' + lng.toFixed(6) + '...');
+    await cargarDatosGeologia();
 
-    try {
-        var r = await fetch(SUPABASE_URL + '/rpc/analizar_riesgo', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                apikey: SUPABASE_KEY,
-                Authorization: 'Bearer ' + SUPABASE_KEY
-            },
-            body: JSON.stringify({ p_lng: lng, p_lat: lat })
-        });
+    var res = analizarRiesgoPunto(lng, lat);
 
-        if (!r.ok) throw new Error('HTTP ' + r.status);
+    var nivel = res.nivel_riesgo;
+    var colorNivel = '#22c55e';
+    var iconoNivel = 'check-circle';
+    if (nivel === 'ALTO') { colorNivel = '#dc2626'; iconoNivel = 'times-circle'; }
+    else if (nivel === 'MEDIO') { colorNivel = '#f97316'; iconoNivel = 'exclamation-circle'; }
 
-        var resultado = await r.json();
-        var res = Array.isArray(resultado) ? resultado[0] : resultado;
+    if (marcadorAnalisis) marcadorAnalisis.setStyle({ fillColor: colorNivel, color: colorNivel });
 
-        var nivel = res.nivel_riesgo || 'BAJO';
-        var colorNivel = '#22c55e';
-        var iconoNivel = 'check-circle';
-        if (nivel === 'ALTO') { colorNivel = '#dc2626'; iconoNivel = 'times-circle'; }
-        else if (nivel === 'MEDIO') { colorNivel = '#f97316'; iconoNivel = 'exclamation-circle'; }
+    var panelHtml = '<div class="popup-title" style="font-size:12px;color:' + colorNivel + ';">Resultado de Analisis</div>';
+    panelHtml += '<div class="info-row" style="padding:6px 0;"><span class="info-label">Nivel de Riesgo</span><span class="info-value" style="color:' + colorNivel + ';font-weight:700;font-size:13px;"><i class="fas fa-' + iconoNivel + '"></i> ' + nivel + '</span></div>';
+    panelHtml += '<div style="border-top:1px solid #2a3a5e;margin:6px 0;"></div>';
 
-        if (marcadorAnalisis) {
-            marcadorAnalisis.setStyle({ fillColor: colorNivel, color: colorNivel });
-        }
-
-        var panelHtml = '<div class="popup-title" style="font-size:12px;color:' + colorNivel + ';">Resultado de Analisis</div>';
-        panelHtml += '<div class="info-row" style="padding:6px 0;"><span class="info-label">Nivel de Riesgo</span><span class="info-value" style="color:' + colorNivel + ';font-weight:700;font-size:13px;"><i class="fas fa-' + iconoNivel + '"></i> ' + nivel + '</span></div>';
-        panelHtml += '<div style="border-top:1px solid #2a3a5e;margin:6px 0;"></div>';
-
-        if (res.dentro_lahar) {
-            panelHtml += '<div class="info-row"><span class="info-label">Lahar</span><span class="info-value" style="color:#dc2626;font-weight:600;">DENTRO de zona de lahar</span></div>';
-            panelHtml += '<div class="info-row"><span class="info-label">Nombre lahar</span><span class="info-value">' + (res.nombre_lahar || 'N/A') + '</span></div>';
-        } else {
-            panelHtml += '<div class="info-row"><span class="info-label">Lahar</span><span class="info-value">Fuera de zona de lahar</span></div>';
-            panelHtml += '<div class="info-row"><span class="info-label">Dist. lahar</span><span class="info-value">' + (res.distancia_lahar_m ? Math.round(res.distancia_lahar_m) + ' m' : 'N/A') + '</span></div>';
-        }
-
-        panelHtml += '<div style="border-top:1px solid #2a3a5e;margin:6px 0;"></div>';
-
-        panelHtml += '<div class="info-row"><span class="info-label">Falla mas cercana</span><span class="info-value">' + (res.nombre_falla || 'N/A') + '</span></div>';
-        panelHtml += '<div class="info-row"><span class="info-label">Tipo falla</span><span class="info-value">' + (res.tipo_falla || 'N/A') + '</span></div>';
-        panelHtml += '<div class="info-row"><span class="info-label">Dist. falla</span><span class="info-value">' + (res.distancia_falla_m ? Math.round(res.distancia_falla_m) + ' m' : 'N/A') + '</span></div>';
-
-        panelHtml += '<div style="border-top:1px solid #2a3a5e;margin:6px 0;"></div>';
-        panelHtml += '<div class="info-row"><span class="info-label">Coordenadas</span><span class="info-value">' + lat.toFixed(6) + ', ' + lng.toFixed(6) + '</span></div>';
-
-        document.getElementById('info-panel').innerHTML = panelHtml;
-        status('Analisis completado — Riesgo: ' + nivel);
-
-        setTimeout(function() {
-            if (modoAnalisis) map.on('click', onMapaClickAnalisis);
-        }, 500);
-
-    } catch(err) {
-        console.error('Error en analisis:', err);
-        status('Error al analizar: ' + err.message + '. Verifica que las funciones SQL esten creadas.');
-        setTimeout(function() {
-            if (modoAnalisis) map.on('click', onMapaClickAnalisis);
-        }, 500);
+    if (res.dentro_lahar) {
+        panelHtml += '<div class="info-row"><span class="info-label">Lahar</span><span class="info-value" style="color:#dc2626;font-weight:600;">DENTRO de zona de lahar</span></div>';
+        panelHtml += '<div class="info-row"><span class="info-label">Nombre</span><span class="info-value">' + (res.nombre_lahar || 'N/A') + '</span></div>';
+    } else {
+        panelHtml += '<div class="info-row"><span class="info-label">Lahar</span><span class="info-value">Fuera de zona</span></div>';
+        panelHtml += '<div class="info-row"><span class="info-label">Dist. lahar</span><span class="info-value">' + (res.distancia_lahar_m !== null ? res.distancia_lahar_m + ' m' : 'N/A') + '</span></div>';
     }
+
+    panelHtml += '<div style="border-top:1px solid #2a3a5e;margin:6px 0;"></div>';
+    panelHtml += '<div class="info-row"><span class="info-label">Falla cercana</span><span class="info-value">' + (res.nombre_falla || 'N/A') + '</span></div>';
+    panelHtml += '<div class="info-row"><span class="info-label">Tipo falla</span><span class="info-value">' + (res.tipo_falla || 'N/A') + '</span></div>';
+    panelHtml += '<div class="info-row"><span class="info-label">Dist. falla</span><span class="info-value">' + (res.distancia_falla_m !== null ? res.distancia_falla_m + ' m' : 'N/A') + '</span></div>';
+    panelHtml += '<div style="border-top:1px solid #2a3a5e;margin:6px 0;"></div>';
+    panelHtml += '<div class="info-row"><span class="info-label">Coordenadas</span><span class="info-value">' + lat.toFixed(6) + ', ' + lng.toFixed(6) + '</span></div>';
+
+    document.getElementById('info-panel').innerHTML = panelHtml;
+    status('Analisis completado — Riesgo: ' + nivel);
+
+    setTimeout(function() { if (modoAnalisis) map.on('click', onMapaClickAnalisis); }, 500);
 }
 
-// ===== Generar PDF de Reportes =====
+// ======================================================================
+// ===== GENERAR PDF =====
+// ======================================================================
 
 async function generarPDF() {
     if (!SUPABASE_URL || !SUPABASE_KEY) { status('Error: Variables de entorno no configuradas'); return; }
@@ -607,58 +692,39 @@ async function generarPDF() {
             return;
         }
 
-        status('Generando PDF con ' + reportes.length + ' reporte(s)...');
-
         var jsPDF = (window.jspdf && window.jspdf.jsPDF) || window.jsPDF;
-        if (!jsPDF) { status('Error: jsPDF no se cargo correctamente. Recarga la pagina.'); return; }
+        if (!jsPDF) { status('Error: jsPDF no se cargo. Recarga la pagina.'); return; }
         var doc = new jsPDF('l', 'mm', 'letter');
+        var pw = doc.internal.pageSize.getWidth(), ph = doc.internal.pageSize.getHeight();
 
-        var pageWidth = doc.internal.pageSize.getWidth();
-        var pageHeight = doc.internal.pageSize.getHeight();
-
-        doc.setFillColor(15, 52, 96);
-        doc.rect(0, 0, pageWidth, pageHeight, 'F');
-        doc.setTextColor(255, 255, 255);
-        doc.setFontSize(28);
-        doc.setFont('helvetica', 'bold');
-        doc.text('REPORTE DE PROBLEMAS CIUDADANOS', pageWidth / 2, 50, { align: 'center' });
-        doc.setFontSize(16);
-        doc.setFont('helvetica', 'normal');
-        doc.text('Banos de Agua Santa — Tungurahua, Ecuador', pageWidth / 2, 65, { align: 'center' });
-        doc.setFontSize(12);
-        doc.text('Especialidad SIG — UTPL 2026', pageWidth / 2, 80, { align: 'center' });
-
-        var fechaGen = new Date().toLocaleDateString('es-EC', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+        doc.setFillColor(15, 52, 96); doc.rect(0, 0, pw, ph, 'F');
+        doc.setTextColor(255, 255, 255); doc.setFontSize(28); doc.setFont('helvetica', 'bold');
+        doc.text('REPORTE DE PROBLEMAS CIUDADANOS', pw/2, 50, { align: 'center' });
+        doc.setFontSize(16); doc.setFont('helvetica', 'normal');
+        doc.text('Banos de Agua Santa — Tungurahua, Ecuador', pw/2, 65, { align: 'center' });
+        doc.setFontSize(12); doc.text('Especialidad SIG — UTPL 2026', pw/2, 80, { align: 'center' });
         doc.setFontSize(10);
-        doc.text('Fecha de generacion: ' + fechaGen, pageWidth / 2, 95, { align: 'center' });
+        doc.text('Fecha: ' + new Date().toLocaleDateString('es-EC', { year:'numeric', month:'long', day:'numeric', hour:'2-digit', minute:'2-digit' }), pw/2, 95, { align: 'center' });
 
         var total = reportes.length;
-        var pendientes = reportes.filter(function(r) { return r.estado === 'pendiente'; }).length;
-        var revision = reportes.filter(function(r) { return r.estado === 'en_revision'; }).length;
-        var resueltos = reportes.filter(function(r) { return r.estado === 'resuelto'; }).length;
-        var rechazados = reportes.filter(function(r) { return r.estado === 'rechazado'; }).length;
+        var pendientes = reportes.filter(function(r){return r.estado==='pendiente';}).length;
+        var revision = reportes.filter(function(r){return r.estado==='en_revision';}).length;
+        var resueltos = reportes.filter(function(r){return r.estado==='resuelto';}).length;
+        var rechazados = reportes.filter(function(r){return r.estado==='rechazado';}).length;
 
-        doc.setFillColor(30, 41, 59);
-        doc.roundedRect(40, 110, pageWidth - 80, 50, 3, 3, 'F');
-        doc.setFontSize(14); doc.setFont('helvetica', 'bold');
-        doc.text('RESUMEN', pageWidth / 2, 125, { align: 'center' });
+        doc.setFillColor(30, 41, 59); doc.roundedRect(40, 110, pw-80, 50, 3, 3, 'F');
+        doc.setFontSize(14); doc.setFont('helvetica', 'bold'); doc.text('RESUMEN', pw/2, 125, { align: 'center' });
         doc.setFontSize(11); doc.setFont('helvetica', 'normal');
-        var col1 = 70, col2 = 150, yStat = 138;
-        doc.text('Total de reportes: ' + total, col1, yStat);
-        doc.text('Pendientes: ' + pendientes, col2, yStat);
-        doc.text('En revision: ' + revision, col1, yStat + 8);
-        doc.text('Resueltos: ' + resueltos, col2, yStat + 8);
-        doc.text('Rechazados: ' + rechazados, col1, yStat + 16);
+        doc.text('Total: ' + total + '  |  Pendientes: ' + pendientes + '  |  En revision: ' + revision, pw/2, 138, { align: 'center' });
+        doc.text('Resueltos: ' + resueltos + '  |  Rechazados: ' + rechazados, pw/2, 148, { align: 'center' });
 
         doc.addPage();
-        doc.setFillColor(15, 52, 96);
-        doc.rect(0, 0, pageWidth, 14, 'F');
-        doc.setTextColor(255, 255, 255);
-        doc.setFontSize(12); doc.setFont('helvetica', 'bold');
-        doc.text('DETALLE DE REPORTES', pageWidth / 2, 10, { align: 'center' });
+        doc.setFillColor(15, 52, 96); doc.rect(0, 0, pw, 14, 'F');
+        doc.setTextColor(255, 255, 255); doc.setFontSize(12); doc.setFont('helvetica', 'bold');
+        doc.text('DETALLE DE REPORTES', pw/2, 10, { align: 'center' });
         doc.setTextColor(0, 0, 0);
 
-        var tiposLabel = { bache_via:'Bache en via', alumbrado_deficiente:'Alumbrado deficiente', basura_acumulada:'Basura acumulada', deslave:'Deslave / derrumbe', inundacion:'Inundacion', senalizacion:'Falta senalizacion', acera_danada:'Acera danada', arbol_caido:'Arbol caido', fuga_agua:'Fuga de agua', peligro_volcanico:'Peligro volcanico', falla_geologica:'Falla geologica', vialidad_peligrosa:'Vialidad peligrosa', contaminacion:'Contaminacion', otro:'Otro' };
+        var tiposLabel = { bache_via:'Bache en via', alumbrado_deficiente:'Alumbrado deficiente', basura_acumulada:'Basura acumulada', deslave:'Deslave', inundacion:'Inundacion', senalizacion:'Falta senalizacion', acera_danada:'Acera danada', arbol_caido:'Arbol caido', fuga_agua:'Fuga de agua', peligro_volcanico:'Peligro volcanico', falla_geologica:'Falla geologica', vialidad_peligrosa:'Vialidad peligrosa', contaminacion:'Contaminacion', otro:'Otro' };
         var estadosLabel = { pendiente:'Pendiente', en_revision:'En revision', resuelto:'Resuelto', rechazado:'Rechazado' };
 
         var tableData = reportes.map(function(rep) {
@@ -666,7 +732,7 @@ async function generarPDF() {
             if (rep.fecha) {
                 var f = new Date(rep.fecha);
                 var pad = function(n) { return n < 10 ? '0' + n : n; };
-                fecha = f.getFullYear() + '/' + pad(f.getMonth()+1) + '/' + pad(f.getDate()) + ' ' + pad(f.getHours()) + ':' + pad(f.getMinutes()) + ':' + pad(f.getSeconds());
+                fecha = f.getFullYear()+'/'+pad(f.getMonth()+1)+'/'+pad(f.getDate())+' '+pad(f.getHours())+':'+pad(f.getMinutes())+':'+pad(f.getSeconds());
             }
             var lat = '', lng = '';
             if (rep.geom && rep.geom.coordinates) { lng = rep.geom.coordinates[0].toFixed(6); lat = rep.geom.coordinates[1].toFixed(6); }
@@ -674,9 +740,7 @@ async function generarPDF() {
         });
 
         doc.autoTable({
-            startY: 20,
-            head: [['#', 'Tipo', 'Comentario', 'Nombre', 'Fecha', 'Estado', 'Lat', 'Lng']],
-            body: tableData, theme: 'grid',
+            startY: 20, head: [['#','Tipo','Comentario','Nombre','Fecha','Estado','Lat','Lng']], body: tableData, theme: 'grid',
             headStyles: { fillColor: [15,52,96], textColor: [255,255,255], fontSize: 8, fontStyle: 'bold' },
             bodyStyles: { fontSize: 7, textColor: [30,30,30] },
             alternateRowStyles: { fillColor: [240,245,255] },
@@ -684,18 +748,13 @@ async function generarPDF() {
             margin: { left: 10, right: 10 },
             didDrawPage: function() {
                 doc.setFontSize(7); doc.setTextColor(150);
-                doc.text('Geoportal Banos — UTPL 2026 Especialidad SIG — Pagina ' + doc.internal.getNumberOfPages(), pageWidth/2, pageHeight-8, { align: 'center' });
+                doc.text('Geoportal Banos — UTPL 2026 — Pagina ' + doc.internal.getNumberOfPages(), pw/2, ph-8, { align: 'center' });
             }
         });
 
-        var nombreArchivo = 'Reportes_Banos_' + new Date().toISOString().slice(0,10) + '.pdf';
-        doc.save(nombreArchivo);
-        status('PDF generado: ' + nombreArchivo);
-
-    } catch(err) {
-        console.error('Error generando PDF:', err);
-        status('Error al generar PDF: ' + err.message);
-    }
+        doc.save('Reportes_Banos_' + new Date().toISOString().slice(0,10) + '.pdf');
+        status('PDF generado correctamente');
+    } catch(err) { status('Error al generar PDF: ' + err.message); }
 
     btn.disabled = false;
     btn.innerHTML = '<i class="fas fa-file-pdf"></i> Generar PDF Reportes';
@@ -707,7 +766,6 @@ async function generarPDF() {
 window.toggleLayer = toggleLayer;
 window.cargarTodasLasCapas = cargarTodasLasCapas;
 window.generarPDF = generarPDF;
-window.activarMapaRiesgo = activarMapaRiesgo;
 window.activarAnalisis = activarAnalisis;
 
 // ===== Inicializacion =====
