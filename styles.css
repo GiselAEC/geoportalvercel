@@ -11,14 +11,14 @@ body {
   height: 100vh;
   display: flex;
   flex-direction: column;
-  background: #1a1a2e;
+  background: #1b5e20;
   overflow: hidden;
 }
 
 /* ===== Header ===== */
 
 #header {
-  background: linear-gradient(135deg, #0f3460, #16213e);
+  background: linear-gradient(135deg, #1b5e20, #f9a825, #0d47a1);
   color: white;
   padding: 10px 20px;
   display: flex;
@@ -36,7 +36,7 @@ body {
 
 #header .subtitle {
   font-size: 11px;
-  color: #a0c4ff;
+  color: #fff9c4;
   margin-top: 2px;
 }
 
@@ -51,7 +51,7 @@ body {
 
 #sidebar {
   width: 320px;
-  background: #16213e;
+  background: #0d3b1f;
   color: #e0e0e0;
   overflow-y: auto;
   display: flex;
@@ -68,21 +68,21 @@ body {
 
 .sidebar-section {
   padding: 12px 15px;
-  border-bottom: 1px solid #1a1a3e;
+  border-bottom: 1px solid #1a2e1a;
 }
 
 .sidebar-section h3 {
   font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 1px;
-  color: #a0c4ff;
+  color: #a5d6a7;
   margin-bottom: 8px;
 }
 
 /* ===== Tarjetas de capa ===== */
 
 .layer-card {
-  background: #1a1a3e;
+  background: #1a2e1a;
   border-radius: 6px;
   padding: 10px 12px;
   margin-bottom: 6px;
@@ -94,12 +94,12 @@ body {
 }
 
 .layer-card:hover {
-  background: #253565;
+  background: #2e5e30;
 }
 
 .layer-card.active {
   background: #0f3460;
-  border-left: 3px solid #4fc3f7;
+  border-left: 3px solid #f9a825;
 }
 
 /* Toggle checkbox visual */
@@ -118,13 +118,13 @@ body {
 }
 
 .layer-toggle.on {
-  border-color: #4fc3f7;
-  background: #4fc3f7;
+  border-color: #f9a825;
+  background: #f9a825;
 }
 
 .layer-toggle.on::after {
   content: '\2713';
-  color: #16213e;
+  color: #0d3b1f;
   font-size: 11px;
   font-weight: bold;
 }
@@ -161,7 +161,7 @@ body {
   top: 0;
   left: 0;
   height: 3px;
-  background: linear-gradient(90deg, #4fc3f7, #00e676);
+  background: linear-gradient(90deg, #f9a825, #00e676);
   z-index: 9999;
   transition: width 0.3s;
   display: none;
@@ -226,7 +226,7 @@ body {
 /* ===== Panel de información ===== */
 
 .info-panel {
-  background: #1a1a3e;
+  background: #1a2e1a;
   border-radius: 6px;
   padding: 12px;
   margin-top: 6px;
@@ -237,7 +237,7 @@ body {
   justify-content: space-between;
   font-size: 11px;
   padding: 3px 0;
-  border-bottom: 1px solid #0f1a3e;
+  border-bottom: 1px solid #0f1a10;
 }
 
 .info-row:last-child {
@@ -352,25 +352,25 @@ body {
 /* ===== Controles Leaflet ===== */
 
 .leaflet-control-zoom a {
-  background: #16213e !important;
+  background: #0d3b1f !important;
   color: #a0c4ff !important;
-  border-color: #1a1a3e !important;
+  border-color: #1a2e1a !important;
 }
 
 .leaflet-control-zoom a:hover {
-  background: #1a1a3e !important;
+  background: #1a2e1a !important;
 }
 
 .leaflet-control-layers {
-  background: #16213e !important;
+  background: #0d3b1f !important;
   color: #e0e0e0 !important;
-  border-color: #1a1a3e !important;
+  border-color: #1a2e1a !important;
   border-radius: 6px !important;
 }
 
 .leaflet-control-layers-toggle {
-  background-color: #16213e !important;
-  border-color: #1a1a3e !important;
+  background-color: #0d3b1f !important;
+  border-color: #1a2e1a !important;
   width: 36px !important;
   height: 36px !important;
   background-image: url('') !important;
@@ -394,7 +394,7 @@ body {
   font-size: 14px;
   margin-bottom: 6px;
   padding-bottom: 4px;
-  border-bottom: 2px solid #4fc3f7;
+  border-bottom: 2px solid #f9a825;
 }
 
 .popup-row {
@@ -417,7 +417,7 @@ body {
 /* ===== Footer ===== */
 
 #footer {
-  background: #0f1a3e;
+  background: #0f1a10;
   color: #94a3b8;
   text-align: center;
   padding: 6px 8px;
@@ -449,7 +449,7 @@ body {
 .modal-header {
   display: flex; justify-content: space-between; align-items: center;
   padding: 14px 18px;
-  border-bottom: 1px solid #2a3a5e;
+  border-bottom: 1px solid #2a3e2a;
 }
 
 .modal-header h3 {
@@ -472,7 +472,7 @@ body {
 }
 
 .modal-body .form-title {
-  font-size: 12px; font-weight: 600; color: #4fc3f7;
+  font-size: 12px; font-weight: 600; color: #f9a825;
   margin-bottom: 6px;
 }
 
@@ -487,9 +487,9 @@ body {
 .modal-body textarea {
   width: 100%;
   padding: 8px 10px;
-  border: 1px solid #2a3a5e;
+  border: 1px solid #2a3e2a;
   border-radius: 6px;
-  background: #0f1a3e;
+  background: #0f1a10;
   color: #e2e8f0;
   font-size: 13px;
   box-sizing: border-box;
@@ -529,8 +529,8 @@ body {
   padding: 12px;
   border: none;
   border-radius: 8px;
-  background: #4fc3f7;
-  color: #0f1a3e;
+  background: #f9a825;
+  color: #0f1a10;
   font-size: 14px;
   font-weight: 700;
   cursor: pointer;
