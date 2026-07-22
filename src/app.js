@@ -309,16 +309,23 @@ function activarAnalisis() {
     map.getContainer().style.cursor = 'crosshair';
     status('Haz clic en cualquier punto del mapa para analizar riesgo');
 
-    map.once('click', onMapaClickAnalisis);
+    map.getContainer().addEventListener('click', handlerAnalisisClick, true);
 }
 
 function limpiarAnalisis() {
     modoAnalisis = false;
     map.getContainer().style.cursor = '';
-    map.off('click', onMapaClickAnalisis);
+    map.getContainer().removeEventListener('click', handlerAnalisisClick, true);
     var btn = document.getElementById('btn-analisis');
     if(btn){btn.innerHTML='<i class="fas fa-search-location"></i> Analizar Riesgo';btn.classList.remove('activo');}
     document.getElementById('info-panel').innerHTML='<div style="font-size:11px;color:#888;text-align:center;padding:8px;">Haz clic en una feature del mapa para ver sus atributos</div>';
+}
+
+function handlerAnalisisClick(e) {
+    if (!modoAnalisis) return;
+    e.stopPropagation();
+    var point = map.containerPointToLatLng([e.offsetX, e.offsetY]);
+    onMapaClickAnalisis({ latlng: point });
 }
 
 async function onMapaClickAnalisis(e) {
@@ -353,10 +360,6 @@ async function onMapaClickAnalisis(e) {
 
     document.getElementById('info-panel').innerHTML=html;
     status('Analisis completado — Riesgo: '+nivel);
-
-    setTimeout(function(){
-        if(modoAnalisis) map.once('click', onMapaClickAnalisis);
-    }, 300);
 }
 
 // ======================================================================
