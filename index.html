@@ -81,9 +81,9 @@
       <button class="btn-cargar" id="btn-cargar" onclick="cargarTodasLasCapas()">
         <i class="fas fa-download"></i> Cargar Todas las Capas
       </button>
-      <a href="/formulario.html" class="btn-reportar">
+      <button class="btn-reportar" onclick="abrirFormulario()">
         <i class="fas fa-exclamation-triangle"></i> Reportar un Problema
-      </a>
+      </button>
       <button class="btn-pdf" id="btn-pdf" onclick="generarPDF()">
         <i class="fas fa-file-pdf"></i> Generar PDF Reportes
       </button>
@@ -137,6 +137,59 @@
 
 <div id="footer">
   UTPL 2026 — Especialidad SIG
+</div>
+
+<div id="modal-reporte" class="modal-overlay" style="display:none;">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3><i class="fas fa-exclamation-triangle"></i> Reportar un Problema</h3>
+      <button class="modal-close" onclick="cerrarFormulario()"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="modal-body">
+      <div class="form-section">
+        <div class="form-title"><i class="fas fa-map-marker-alt"></i> Ubicacion del problema</div>
+        <p class="form-hint">Haz clic en el mapa para ubicar el problema, o escribe coordenadas.</p>
+        <div class="coord-row">
+          <div class="coord-field"><label>Latitud</label><input id="rpt-lat" type="number" step="any" placeholder="-1.3928"></div>
+          <div class="coord-field"><label>Longitud</label><input id="rpt-lng" type="number" step="any" placeholder="-78.4364"></div>
+        </div>
+        <div id="rpt-coord-status" class="coord-status"><i class="fas fa-crosshairs"></i> Selecciona un punto en el mapa</div>
+      </div>
+      <div class="form-section">
+        <div class="form-title"><i class="fas fa-list-ul"></i> Tipo de problema</div>
+        <select id="rpt-tipo">
+          <option value="">-- Selecciona --</option>
+          <option value="bache_via">Bache en via</option>
+          <option value="alumbrado_deficiente">Alumbrado deficiente</option>
+          <option value="basura_acumulada">Basura acumulada</option>
+          <option value="deslave">Deslave / derrumbe</option>
+          <option value="inundacion">Inundacion</option>
+          <option value="senalizacion">Falta senalizacion</option>
+          <option value="acera_danada">Acera danada</option>
+          <option value="arbol_caido">Arbol caido</option>
+          <option value="fuga_agua">Fuga de agua</option>
+          <option value="peligro_volcanico">Peligro volcanico</option>
+          <option value="falla_geologica">Falla geologica</option>
+          <option value="vialidad_peligrosa">Vialidad peligrosa</option>
+          <option value="contaminacion">Contaminacion</option>
+          <option value="otro">Otro</option>
+        </select>
+      </div>
+      <div class="form-section">
+        <div class="form-title"><i class="fas fa-comment-dots"></i> Descripcion</div>
+        <textarea id="rpt-comentario" rows="3" placeholder="Describe el problema..."></textarea>
+      </div>
+      <div class="form-section">
+        <div class="form-title"><i class="fas fa-user"></i> Contacto <span class="optional">(opcional)</span></div>
+        <input id="rpt-nombre" type="text" placeholder="Tu nombre">
+        <input id="rpt-telefono" type="tel" placeholder="Tu telefono">
+      </div>
+      <div id="rpt-msg"></div>
+      <button id="rpt-btn-enviar" class="btn-enviar" onclick="enviarReporte()">
+        <i class="fas fa-paper-plane"></i> Enviar Reporte
+      </button>
+    </div>
+  </div>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>

@@ -437,7 +437,115 @@ async function generarPDF() {
     btn.disabled=false;btn.innerHTML='<i class="fas fa-file-pdf"></i> Generar PDF Reportes';showLoading(false);
 }
 
+// ======================================================================
+// ===== REPORTE CIUDADANO (MODAL) =====
+// ======================================================================
+
+var modoReporte = false;
+var markerReporte = null;
+
+function abrirFormulario() {
+    document.getElementById('modal-reporte').style.display = 'flex';
+    modoReporte = true;
+    status('Haz clic en el mapa para ubicar el problema');
+}
+
+function cerrarFormulario() {
+    document.getElementById('modal-reporte').style.display = 'none';
+    modoReporte = false;
+    if (markerReporte) { map.removeLayer(markerReporte); markerReporte = null; }
+}
+
+function onMapaClickReporte(e) {
+    if (!modoReporte) return;
+    var lat = e.latlng.lat, lng = e.latlng.lng;
+    document.getElementById('rpt-lat').value = lat.toFixed(6);
+    document.getElementById('rpt-lng').value = lng.toFixed(6);
+    if (markerReporte) map.removeLayer(markerReporte);
+    markerReporte = L.circleMarker([lat,lng],{radius:8,fillColor:'#ef4444',color:'#fff',weight:2,fillOpacity:0.9}).addTo(map);
+    markerReporte.bindPopup('Ubicacion del reporte').openPopup();
+    var st = document.getElementById('rpt-coord-status');
+    st.innerHTML = '<i class="fas fa-check-circle"></i> Punto: ' + lat.toFixed(6) + ', ' + lng.toFixed(6);
+    st.className = 'coord-status ok';
+}
+
+async function enviarReporte() {
+    var lat = parseFloat(document.getElementById('rpt-lat').value);
+    var lng = parseFloat(document.getElementById('rpt-lng').value);
+    var tipo = document.getElementById('rpt-tipo').value;
+    var comentario = document.getElementById('rpt-comentario').value.trim();
+    var nombre = document.getElementById('rpt-nombre').value.trim();
+    var telefono = document.getElementById('rpt-telefono').value.trim();
+    var msgEl = document.getElementById('rpt-msg');
+
+    if (isNaN(lat) || isNaN(lng)) { msgEl.className='form-msg error'; msgEl.innerHTML='Selecciona una ubicacion en el mapa.'; return; }
+    if (!tipo) { msgEl.className='form-msg error'; msgEl.innerHTML='Selecciona un tipo de problema.'; return; }
+    if (!SUPABASE_URL || !SUPABASE_KEY) { msgEl.className='form-msg error'; msgEl.innerHTML='Variables de entorno no configuradas.'; return; }
+
+    var btn = document.getElementById('rpt-btn-enviar');
+    btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enviando...';
+    msgEl.className = 'form-msg'; msgEl.innerHTML = '';
+
+    var enviado = false;
+
+    try {
+        var r = await fetch(SUPABASE_URL + '/rpc/insertar_reporte', {
+            method: 'POST',
+            headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ p_tipo_problema: tipo, p_comentario: comentario || null, p_nombre: nombre || null, p_telefono: telefono || null, p_latitud: lat, p_longitud: lng })
+        });
+        if (r.ok) {
+            var result = await r.json();
+            if (result && result.success) {
+                msgEl.className = 'form-msg success';
+                msgEl.innerHTML = '<i class="fas fa-check-circle"></i> <b>Reporte #'+result.id+' enviado!</b>';
+                enviado = true;
+            }
+        }
+    } catch(_){}
+
+    if (!enviado) {
+        try {
+            var r2 = await fetch(SUPABASE_URL + '/reportes_ciudadanos', {
+                method: 'POST',
+                headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+                body: JSON.stringify({ tipo_problema: tipo, comentario: comentario || null, nombre: nombre || null, telefono: telefono || null, geom: { type: 'Point', coordinates: [lng, lat] } })
+            });
+            if (r2.ok) {
+                var rows = await r2.json();
+                var id = (rows && rows[0]) ? rows[0].id : '?';
+                msgEl.className = 'form-msg success';
+                msgEl.innerHTML = '<i class="fas fa-check-circle"></i> <b>Reporte #'+id+' enviado!</b>';
+            } else {
+                msgEl.className = 'form-msg error';
+                msgEl.innerHTML = 'Error al enviar. Verifica que la tabla exista.';
+            }
+        } catch(err2) {
+            msgEl.className = 'form-msg error';
+            msgEl.innerHTML = 'Error de conexion.';
+        }
+    }
+
+    btn.disabled = false; btn.innerHTML = '<i class="fas fa-paper-plane"></i> Enviar Reporte';
+
+    if (enviado) {
+        document.getElementById('rpt-tipo').value = '';
+        document.getElementById('rpt-comentario').value = '';
+        document.getElementById('rpt-nombre').value = '';
+        document.getElementById('rpt-telefono').value = '';
+        document.getElementById('rpt-lat').value = '';
+        document.getElementById('rpt-lng').value = '';
+        if (markerReporte) { map.removeLayer(markerReporte); markerReporte = null; }
+        var st = document.getElementById('rpt-coord-status');
+        st.innerHTML = '<i class="fas fa-crosshairs"></i> Selecciona un punto en el mapa';
+        st.className = 'coord-status';
+    }
+}
+
+map.on('click', onMapaClickReporte);
+
 window.toggleLayer=toggleLayer;window.cargarTodasLasCapas=cargarTodasLasCapas;window.generarPDF=generarPDF;window.activarAnalisis=activarAnalisis;
+window.abrirFormulario=abrirFormulario;window.cerrarFormulario=cerrarFormulario;window.enviarReporte=enviarReporte;
 
 window.addEventListener('load',function(){
     Object.keys(capasConfig).forEach(function(t){toggleLayer(t);});

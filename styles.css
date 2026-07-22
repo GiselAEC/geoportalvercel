@@ -428,6 +428,131 @@ body {
   flex-shrink: 0;
 }
 
+/* ===== Modal Reporte ===== */
+
+.modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.6);
+  z-index: 10000;
+  display: flex; align-items: center; justify-content: center;
+}
+
+.modal-box {
+  background: #1a2a4e;
+  border-radius: 12px;
+  width: 90%; max-width: 480px;
+  max-height: 85vh;
+  overflow-y: auto;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+}
+
+.modal-header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 14px 18px;
+  border-bottom: 1px solid #2a3a5e;
+}
+
+.modal-header h3 {
+  margin: 0; font-size: 15px; color: #fff;
+}
+
+.modal-close {
+  background: none; border: none; color: #94a3b8; font-size: 18px; cursor: pointer;
+  padding: 4px 8px; border-radius: 4px;
+}
+
+.modal-close:hover { color: #fff; background: rgba(255,255,255,0.1); }
+
+.modal-body {
+  padding: 16px 18px;
+}
+
+.modal-body .form-section {
+  margin-bottom: 14px;
+}
+
+.modal-body .form-title {
+  font-size: 12px; font-weight: 600; color: #4fc3f7;
+  margin-bottom: 6px;
+}
+
+.modal-body .form-hint {
+  font-size: 11px; color: #64748b; margin: 0 0 8px 0;
+}
+
+.modal-body input[type="text"],
+.modal-body input[type="tel"],
+.modal-body input[type="number"],
+.modal-body select,
+.modal-body textarea {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid #2a3a5e;
+  border-radius: 6px;
+  background: #0f1a3e;
+  color: #e2e8f0;
+  font-size: 13px;
+  box-sizing: border-box;
+  margin-bottom: 6px;
+}
+
+.modal-body select { cursor: pointer; }
+.modal-body textarea { resize: vertical; }
+
+.coord-row {
+  display: flex; gap: 10px;
+}
+
+.coord-field {
+  flex: 1;
+}
+
+.coord-field label {
+  display: block;
+  font-size: 11px;
+  color: #94a3b8;
+  margin-bottom: 3px;
+}
+
+.coord-status {
+  font-size: 11px;
+  color: #94a3b8;
+  padding: 6px 0;
+}
+
+.coord-status.ok {
+  color: #4caf50;
+}
+
+.btn-enviar {
+  width: 100%;
+  padding: 12px;
+  border: none;
+  border-radius: 8px;
+  background: #4fc3f7;
+  color: #0f1a3e;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  margin-top: 8px;
+}
+
+.btn-enviar:hover { background: #29b6f6; }
+.btn-enviar:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.form-msg {
+  padding: 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  margin-top: 8px;
+  display: none;
+}
+
+.form-msg.error { display: block; background: #4c1d1d; color: #fca5a5; border: 1px solid #dc2626; }
+.form-msg.success { display: block; background: #1d3c1d; color: #86efac; border: 1px solid #22c55e; }
+
+.optional { color: #64748b; font-weight: normal; font-size: 11px; }
+
 /* ===== Responsive ===== */
 
 @media (max-width: 768px) {
