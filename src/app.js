@@ -23,8 +23,7 @@ const capasConfig = {
     fallasbanos: { nombre:'Fallas Geologicas', color:'#ff9800', weight:3, dashArray:'8, 4', camposPopup:['nam','tfll','shape_leng'], camposLabels:{nam:'Nombre',tfll:'Tipo Falla',shape_leng:'Longitud'}, orden:3 },
     viasbanos: { nombre:'Vias', color:'#4caf50', weight:2.5, camposPopup:['gid','length'], camposLabels:{gid:'ID',length:'Longitud'}, orden:4 },
     casasbanos: { nombre:'Casas / Edificaciones', color:'#9c27b0', camposPopup:['nam','descripcio','fcode','acc_desc','txt'], camposLabels:{nam:'Nombre',descripcio:'Descripcion',fcode:'Codigo',acc_desc:'Acceso',txt:'Texto'}, orden:5 },
-    reportes_ciudadanos: { nombre:'Reportes Ciudadanos', color:'#92400e', camposPopup:['id','tipo_problema','comentario','nombre','telefono','fecha'], camposLabels:{id:'Numero',tipo_problema:'Tipo de Problema',comentario:'Comentario',nombre:'Nombre',telefono:'Telefono',fecha:'Fecha'}, orden:6 },
-    zonas_riesgo: { nombre:'Zonas de Riesgo', orden:7 }
+    reportes_ciudadanos: { nombre:'Reportes Ciudadanos', color:'#92400e', camposPopup:['id','tipo_problema','comentario','nombre','telefono','fecha'], camposLabels:{id:'Numero',tipo_problema:'Tipo de Problema',comentario:'Comentario',nombre:'Nombre',telefono:'Telefono',fecha:'Fecha'}, orden:6 }
 };
 
 let capasActivas = {};
@@ -180,17 +179,6 @@ async function cargarTodasLasCapas() {
     for (var i = 0; i < orden.length; i++) {
         var tabla = orden[i], cfg = capasConfig[tabla];
 
-        if (tabla === 'zonas_riesgo') {
-            status('Cargando Zonas de Riesgo ('+(i+1)+'/'+orden.length+')...');
-            document.getElementById('loading-bar').style.width = ((i+1)/orden.length*100)+'%';
-            try {
-                await cargarDatosGeologia();
-                var capa = crearCapaRiesgo();
-                if (capa) { capa.addTo(map); capasCargadas['zonas_riesgo'] = capa; cargadas++; }
-            } catch(err) { console.warn('Error zonas riesgo: '+err.message); }
-            continue;
-        }
-
         status('Cargando '+cfg.nombre+' ('+(i+1)+'/'+orden.length+')...');
         document.getElementById('loading-bar').style.width = ((i+1)/orden.length*100)+'%';
 
@@ -270,123 +258,6 @@ async function cargarTabla(tabla, cfg) {
             layer.on('click',function(){mostrarInfoPanel(feature.properties,tabla,cfg);});
         }
     });
-}
-
-// ======================================================================
-// ===== ZONAS DE RIESGO (buffer alrededor de fallas y lahares) =====
-// ======================================================================
-
-function crearBufferLinea(coords, radioGrados) {
-    var leftSide = [], rightSide = [];
-    for (var i = 0; i < coords.length; i++) {
-        var lng = coords[i][0], lat = coords[i][1];
-        var perpAngle;
-        if (i === 0) {
-            var dlng = coords[1][0]-lng, dlat = coords[1][1]-lat;
-            perpAngle = Math.atan2(dlat, dlng) + Math.PI/2;
-        } else if (i === coords.length-1) {
-            var dlng = lng-coords[i-1][0], dlat = lat-coords[i-1][1];
-            perpAngle = Math.atan2(dlat, dlng) + Math.PI/2;
-        } else {
-            var dlng1 = lng-coords[i-1][0], dlat1 = lat-coords[i-1][1];
-            var dlng2 = coords[i+1][0]-lng, dlat2 = coords[i+1][1]-lat;
-            perpAngle = Math.atan2(dlat1+dlat2, dlng1+dlng2) + Math.PI/2;
-        }
-        leftSide.push([lng + radioGrados*Math.cos(perpAngle), lat + radioGrados*Math.sin(perpAngle)]);
-        rightSide.push([lng - radioGrados*Math.cos(perpAngle), lat - radioGrados*Math.sin(perpAngle)]);
-    }
-    rightSide.reverse();
-    return leftSide.concat(rightSide).concat([leftSide[0]]);
-}
-
-function crearBufferGeom(geom, radioGrados) {
-    var rings = [];
-    if (geom.type === 'LineString') {
-        rings.push(crearBufferLinea(geom.coordinates, radioGrados));
-    } else if (geom.type === 'MultiLineString') {
-        for (var i = 0; i < geom.coordinates.length; i++) {
-            rings.push(crearBufferLinea(geom.coordinates[i], radioGrados));
-        }
-    } else if (geom.type === 'Polygon') {
-        rings.push(crearBufferLinea(geom.coordinates[0], radioGrados));
-    } else if (geom.type === 'MultiPolygon') {
-        for (var i = 0; i < geom.coordinates.length; i++) {
-            rings.push(crearBufferLinea(geom.coordinates[i][0], radioGrados));
-        }
-    }
-    if (rings.length === 0) return null;
-    if (rings.length === 1) return { type:'Polygon', coordinates:[rings[0]] };
-    return { type:'MultiPolygon', coordinates: rings.map(function(r){return [r];}) };
-}
-
-function crearCapaRiesgo() {
-    var capasCombo = L.layerGroup();
-
-    // ALTO: Lahares mismos (zonas directas de lahar)
-    if (datosGeologia.lahares.length > 0) {
-        var fL = datosGeologia.lahares.map(function(r){
-            return {type:'Feature',properties:{desc:r.descrip||'Zona de lahar',volcan:r.volcan||'Tungurahua'},geometry:r.geom};
-        });
-        L.geoJSON({type:'FeatureCollection',features:fL}, {
-            style:function(){return{color:'#dc2626',fillColor:'#ef4444',fillOpacity:0.4,weight:2};},
-            onEachFeature:function(f,layer){
-                layer.bindPopup('<div class="popup-title" style="color:#dc2626;">RIESGO ALTO - Zona de Lahar</div><div class="popup-row"><span class="popup-key">Descripcion:</span><span class="popup-val">'+f.properties.desc+'</span></div><div class="popup-row"><span class="popup-key">Volcan:</span><span class="popup-val">'+f.properties.volcan+'</span></div>');
-            }
-        }).addTo(capasCombo);
-    }
-
-    // ALTO: Buffer de lahares (~300m extra)
-    if (datosGeologia.lahares.length > 0) {
-        var fLB = [];
-        datosGeologia.lahares.forEach(function(r){
-            var buf = crearBufferGeom(r.geom, 0.0027);
-            if (buf) fLB.push({type:'Feature',properties:{desc:'Zona de influencia de lahar (~300m)'},geometry:buf});
-        });
-        if (fLB.length > 0) {
-            L.geoJSON({type:'FeatureCollection',features:fLB}, {
-                style:function(){return{color:'#dc2626',fillColor:'#fca5a5',fillOpacity:0.25,weight:1,dashArray:'4,4'};},
-                onEachFeature:function(f,layer){
-                    layer.bindPopup('<div class="popup-title" style="color:#dc2626;">RIESGO ALTO - Zona de influencia</div><div class="popup-row"><span class="popup-val">'+f.properties.desc+'</span></div>');
-                }
-            }).addTo(capasCombo);
-        }
-    }
-
-    // MEDIO: Buffer de fallas (~200m)
-    if (datosGeologia.fallas.length > 0) {
-        var fM = [];
-        datosGeologia.fallas.forEach(function(f){
-            var buf = crearBufferGeom(f.geom, 0.0018);
-            if (buf) fM.push({type:'Feature',properties:{nam:f.nam||'',tfll:f.tfll||''},geometry:buf});
-        });
-        if (fM.length > 0) {
-            L.geoJSON({type:'FeatureCollection',features:fM}, {
-                style:function(){return{color:'#f97316',fillColor:'#fb923c',fillOpacity:0.2,weight:1};},
-                onEachFeature:function(f,layer){
-                    layer.bindPopup('<div class="popup-title" style="color:#f97316;">RIESGO MEDIO - Zona de influencia de falla (~200m)</div><div class="popup-row"><span class="popup-key">Falla:</span><span class="popup-val">'+f.properties.nam+'</span></div>');
-                }
-            }).addTo(capasCombo);
-        }
-    }
-
-    // BAJO: Buffer de fallas (~500m)
-    if (datosGeologia.fallas.length > 0) {
-        var fB = [];
-        datosGeologia.fallas.forEach(function(f){
-            var buf = crearBufferGeom(f.geom, 0.0045);
-            if (buf) fB.push({type:'Feature',properties:{nam:f.nam||'',tfll:f.tfll||''},geometry:buf});
-        });
-        if (fB.length > 0) {
-            L.geoJSON({type:'FeatureCollection',features:fB}, {
-                style:function(){return{color:'#22c55e',fillColor:'#86efac',fillOpacity:0.1,weight:1};},
-                onEachFeature:function(f,layer){
-                    layer.bindPopup('<div class="popup-title" style="color:#22c55e;">RIESGO BAJO - Zona de influencia de falla (~500m)</div><div class="popup-row"><span class="popup-key">Falla:</span><span class="popup-val">'+f.properties.nam+'</span></div>');
-                }
-            }).addTo(capasCombo);
-        }
-    }
-
-    return capasCombo;
 }
 
 // ======================================================================
