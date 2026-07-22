@@ -18,7 +18,7 @@ osmLayer.addTo(map);
 L.control.layers({ 'OpenStreetMap': osmLayer, 'Topografico': topoLayer, 'Satelite (Esri)': satLayer, 'Satelite (Google)': googleSat, 'Hibrido (Google)': googleHybrid, 'Terreno (Google)': terrainLayer, 'Oscuro': darkLayer }, null, { collapsed: true, position: 'topright' }).addTo(map);
 
 const capasConfig = {
-    cantonbanos: { nombre:'Canton Banos', color:'#2196f3', fillOpacity:0.15, weight:2.5, camposPopup:['can_descri','pro_descri','region','can_codigo','pro_codigo','area','perimeter'], camposLabels:{can_descri:'Canton',pro_descri:'Provincia',region:'Region',can_codigo:'Codigo Canton',pro_codigo:'Codigo Provincia',area:'Area',perimeter:'Perimetro'}, orden:1 },
+    cantonbanos: { nombre:'Canton Banos', color:'#1565c0', fillOpacity:0.15, weight:2.5, camposPopup:['can_descri','pro_descri','region','can_codigo','pro_codigo','area','perimeter'], camposLabels:{can_descri:'Canton',pro_descri:'Provincia',region:'Region',can_codigo:'Codigo Canton',pro_codigo:'Codigo Provincia',area:'Area',perimeter:'Perimetro'}, orden:1 },
     laharestungurahua: { nombre:'Lahares Tungurahua', color:'#f44336', fillOpacity:0.3, weight:2, camposPopup:['descrip','volcan','dxf_text','area','perimeter'], camposLabels:{descrip:'Descripcion',volcan:'Volcan',dxf_text:'Referencia',area:'Area',perimeter:'Perimetro'}, orden:2 },
     fallasbanos: { nombre:'Fallas Geologicas', color:'#ff9800', weight:3, dashArray:'8, 4', camposPopup:['nam','tfll','shape_leng'], camposLabels:{nam:'Nombre',tfll:'Tipo Falla',shape_leng:'Longitud'}, orden:3 },
     viasbanos: { nombre:'Vias', color:'#4caf50', weight:2.5, camposPopup:['gid','length'], camposLabels:{gid:'ID',length:'Longitud'}, orden:4 },
