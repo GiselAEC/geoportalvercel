@@ -327,6 +327,50 @@ body {
   cursor: default;
 }
 
+.btn-riesgo {
+  display: block;
+  width: 100%;
+  padding: 10px;
+  background: linear-gradient(135deg, #dc2626, #991b1b);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 13px;
+  text-align: center;
+  margin-top: 8px;
+  transition: opacity 0.2s;
+}
+
+.btn-riesgo:hover { opacity: 0.9; }
+
+.btn-riesgo.activo {
+  background: linear-gradient(135deg, #16a34a, #15803d);
+}
+
+.btn-analisis {
+  display: block;
+  width: 100%;
+  padding: 10px;
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 13px;
+  text-align: center;
+  margin-top: 8px;
+  transition: opacity 0.2s;
+}
+
+.btn-analisis:hover { opacity: 0.9; }
+
+.btn-analisis.activo {
+  background: linear-gradient(135deg, #6b7280, #4b5563);
+}
+
 /* ===== Controles Leaflet ===== */
 
 .leaflet-control-zoom a {
