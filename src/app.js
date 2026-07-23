@@ -308,7 +308,7 @@ function mostrarInfoPanel(props,tabla,cfg) {
         html+='<div style="border-top:1px solid #2a3a5e;margin:8px 0;"></div>';
         html+='<div style="font-size:11px;color:#94a3b8;margin-bottom:6px;">Estado del reporte:</div>';
         html+='<div class="estado-buttons">';
-        var estados=[{v:'pendiente',l:'Pendiente',c:'#92400e'},{v:'en_revision',l:'En Revision',c:'#b45309'},{v:'resuelto',l:'Solucionado',c:'#3f6212'}];
+        var estados=[{v:'pendiente',l:'Pendiente',c:'#92400e'},{v:'en_revision',l:'En Revision',c:'#b45309'},{v:'resuelto',l:'Resuelto',c:'#3f6212'}];
         estados.forEach(function(e){
             var sel=est===e.v;
             html+='<button class="estado-btn'+(sel?' active':'')+'" style="'+(sel?'background:'+e.c+';color:#fff;':'')+'" onclick="cambiarEstado('+props.id+',\''+e.v+'\')">'+e.l+'</button>';
@@ -326,7 +326,22 @@ async function cambiarEstado(id,nuevoEstado){
             headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY,'Content-Type':'application/json'},
             body:JSON.stringify({estado:nuevoEstado})
         });
-        if(r.ok){status('Estado actualizado a: '+nuevoEstado);}
+        if(r.ok){
+            status('Estado actualizado a: '+nuevoEstado);
+            if(capasCargadas['reportes_ciudadanos']){
+                map.removeLayer(capasCargadas['reportes_ciudadanos']);
+                delete capasCargadas['reportes_ciudadanos'];
+            }
+            var features=await cargarDatosTabla('reportes_ciudadanos');
+            if(features&&features.length>0){
+                datosGeoJSON['reportes_ciudadanos']=features;
+                var capa=construirCapaLeaflet(features,'reportes_ciudadanos',capasConfig['reportes_ciudadanos']);
+                if(capa){capa.addTo(map);capasCargadas['reportes_ciudadanos']=capa;}
+            }
+            var props=null;
+            if(features){features.forEach(function(f){if(f.properties&&f.properties.id===id)props=f.properties;});}
+            if(props)mostrarInfoPanel(props,'reportes_ciudadanos',capasConfig['reportes_ciudadanos']);
+        }
     }catch(e){status('Error al actualizar estado');}
 }
 
