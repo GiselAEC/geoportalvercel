@@ -432,15 +432,16 @@ body {
 
 .modal-overlay {
   position: fixed; inset: 0;
-  background: rgba(0,0,0,0.6);
   z-index: 10000;
   display: flex; align-items: center; justify-content: center;
+  pointer-events: none;
 }
 
 .modal-box {
+  pointer-events: auto;
   background: #1a2a4e;
   border-radius: 12px;
-  width: 90%; max-width: 480px;
+  width: 380px;
   max-height: 85vh;
   overflow-y: auto;
   box-shadow: 0 8px 32px rgba(0,0,0,0.5);
