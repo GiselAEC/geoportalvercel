@@ -23,7 +23,7 @@ const capasConfig = {
     fallasbanos: { nombre:'Fallas Geologicas', color:'#ff9800', weight:3, dashArray:'8, 4', camposPopup:['nam','tfll','shape_leng'], camposLabels:{nam:'Nombre',tfll:'Tipo Falla',shape_leng:'Longitud'}, orden:3 },
     viasbanos: { nombre:'Vias', color:'#4caf50', weight:2.5, camposPopup:['gid','length'], camposLabels:{gid:'ID',length:'Longitud'}, orden:4 },
     casasbanos: { nombre:'Casas / Edificaciones', color:'#9c27b0', camposPopup:['nam','descripcio','fcode','acc_desc','txt'], camposLabels:{nam:'Nombre',descripcio:'Descripcion',fcode:'Codigo',acc_desc:'Acceso',txt:'Texto'}, orden:5 },
-    reportes_ciudadanos: { nombre:'Reportes Ciudadanos', color:'#92400e', camposPopup:['id','tipo_problema','comentario','nombre','telefono','fecha'], camposLabels:{id:'Numero',tipo_problema:'Tipo de Problema',comentario:'Comentario',nombre:'Nombre',telefono:'Telefono',fecha:'Fecha'}, orden:6 }
+    reportes_ciudadanos: { nombre:'Reportes Ciudadanos', color:'#92400e', camposPopup:['tipo_problema','comentario','nombre','telefono','fecha'], camposLabels:{tipo_problema:'Tipo de Problema',comentario:'Comentario',nombre:'Nombre',telefono:'Telefono',fecha:'Fecha'}, orden:6 }
 };
 
 let capasActivas = {};
@@ -483,6 +483,7 @@ async function enviarReporte() {
     var lat = parseFloat(document.getElementById('rpt-lat').value);
     var lng = parseFloat(document.getElementById('rpt-lng').value);
     var tipo = document.getElementById('rpt-tipo').value;
+    var estado = document.getElementById('rpt-estado').value;
     var comentario = document.getElementById('rpt-comentario').value.trim();
     var nombre = document.getElementById('rpt-nombre').value.trim();
     var telefono = document.getElementById('rpt-telefono').value.trim();
@@ -502,7 +503,7 @@ async function enviarReporte() {
         var r = await fetch(SUPABASE_URL + '/rpc/insertar_reporte', {
             method: 'POST',
             headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ p_tipo_problema: tipo, p_comentario: comentario || null, p_nombre: nombre || null, p_telefono: telefono || null, p_latitud: lat, p_longitud: lng })
+            body: JSON.stringify({ p_tipo_problema: tipo, p_comentario: comentario || null, p_nombre: nombre || null, p_telefono: telefono || null, p_latitud: lat, p_longitud: lng, p_estado: estado })
         });
         if (r.ok) {
             var result = await r.json();
@@ -519,7 +520,7 @@ async function enviarReporte() {
             var r2 = await fetch(SUPABASE_URL + '/reportes_ciudadanos', {
                 method: 'POST',
                 headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
-                body: JSON.stringify({ tipo_problema: tipo, comentario: comentario || null, nombre: nombre || null, telefono: telefono || null, geom: { type: 'Point', coordinates: [lng, lat] } })
+                body: JSON.stringify({ tipo_problema: tipo, comentario: comentario || null, nombre: nombre || null, telefono: telefono || null, geom: { type: 'Point', coordinates: [lng, lat] }, estado: estado })
             });
             if (r2.ok) {
                 var rows = await r2.json();
@@ -540,6 +541,7 @@ async function enviarReporte() {
 
     if (enviado) {
         document.getElementById('rpt-tipo').value = '';
+        document.getElementById('rpt-estado').value = 'pendiente';
         document.getElementById('rpt-comentario').value = '';
         document.getElementById('rpt-nombre').value = '';
         document.getElementById('rpt-telefono').value = '';
