@@ -448,12 +448,22 @@ function abrirFormulario() {
     document.getElementById('modal-reporte').style.display = 'flex';
     modoReporte = true;
     status('Haz clic en el mapa para ubicar el problema');
+    map.getContainer().addEventListener('click', handlerReporteClick, true);
 }
 
 function cerrarFormulario() {
     document.getElementById('modal-reporte').style.display = 'none';
     modoReporte = false;
+    map.getContainer().removeEventListener('click', handlerReporteClick, true);
     if (markerReporte) { map.removeLayer(markerReporte); markerReporte = null; }
+}
+
+function handlerReporteClick(e) {
+    if (!modoReporte) return;
+    e.stopPropagation();
+    var point = map.mouseEventToContainerPoint(e);
+    var latlng = map.containerPointToLatLng(point);
+    onMapaClickReporte({ latlng: latlng });
 }
 
 function onMapaClickReporte(e) {
@@ -541,8 +551,6 @@ async function enviarReporte() {
         st.className = 'coord-status';
     }
 }
-
-map.on('click', onMapaClickReporte);
 
 window.toggleLayer=toggleLayer;window.cargarTodasLasCapas=cargarTodasLasCapas;window.generarPDF=generarPDF;window.activarAnalisis=activarAnalisis;
 window.abrirFormulario=abrirFormulario;window.cerrarFormulario=cerrarFormulario;window.enviarReporte=enviarReporte;
