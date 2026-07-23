@@ -297,13 +297,37 @@ function mostrarInfoPanel(props,tabla,cfg) {
     if (modoAnalisis) return;
     var html='<div class="popup-title" style="font-size:12px;">'+cfg.nombre+'</div>';
     Object.keys(props).forEach(function(k){
-        if(['geom','geometry','geojson','estado'].indexOf(k)!==-1)return;
+        if(['geom','geometry','geojson'].indexOf(k)!==-1)return;
         var val=props[k]; if(val===null||val===undefined||val==='')return;
         var label=(cfg.camposLabels&&cfg.camposLabels[k])||k;
         if(k==='fecha'&&tabla==='reportes_ciudadanos')val=formatFecha(val);
         html+='<div class="info-row"><span class="info-label">'+label+'</span><span class="info-value">'+val+'</span></div>';
     });
+    if(tabla==='reportes_ciudadanos'&&props.id){
+        var est=props.estado||'pendiente';
+        html+='<div style="border-top:1px solid #2a3a5e;margin:8px 0;"></div>';
+        html+='<div style="font-size:11px;color:#94a3b8;margin-bottom:6px;">Estado del reporte:</div>';
+        html+='<div class="estado-buttons">';
+        var estados=[{v:'pendiente',l:'Pendiente',c:'#92400e'},{v:'en_revision',l:'En Revision',c:'#b45309'},{v:'resuelto',l:'Solucionado',c:'#3f6212'}];
+        estados.forEach(function(e){
+            var sel=est===e.v;
+            html+='<button class="estado-btn'+(sel?' active':'')+'" style="'+(sel?'background:'+e.c+';color:#fff;':'')+'" onclick="cambiarEstado('+props.id+',\''+e.v+'\')">'+e.l+'</button>';
+        });
+        html+='</div>';
+    }
     document.getElementById('info-panel').innerHTML=html;
+}
+
+async function cambiarEstado(id,nuevoEstado){
+    if(!SUPABASE_URL||!SUPABASE_KEY)return;
+    try{
+        var r=await fetch(SUPABASE_URL+'/reportes_ciudadanos?id=eq.'+id,{
+            method:'PATCH',
+            headers:{apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY,'Content-Type':'application/json'},
+            body:JSON.stringify({estado:nuevoEstado})
+        });
+        if(r.ok){status('Estado actualizado a: '+nuevoEstado);}
+    }catch(e){status('Error al actualizar estado');}
 }
 
 // ======================================================================
@@ -483,7 +507,6 @@ async function enviarReporte() {
     var lat = parseFloat(document.getElementById('rpt-lat').value);
     var lng = parseFloat(document.getElementById('rpt-lng').value);
     var tipo = document.getElementById('rpt-tipo').value;
-    var estado = document.getElementById('rpt-estado').value;
     var comentario = document.getElementById('rpt-comentario').value.trim();
     var nombre = document.getElementById('rpt-nombre').value.trim();
     var telefono = document.getElementById('rpt-telefono').value.trim();
@@ -503,7 +526,7 @@ async function enviarReporte() {
         var r = await fetch(SUPABASE_URL + '/rpc/insertar_reporte', {
             method: 'POST',
             headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ p_tipo_problema: tipo, p_comentario: comentario || null, p_nombre: nombre || null, p_telefono: telefono || null, p_latitud: lat, p_longitud: lng, p_estado: estado })
+            body: JSON.stringify({ p_tipo_problema: tipo, p_comentario: comentario || null, p_nombre: nombre || null, p_telefono: telefono || null, p_latitud: lat, p_longitud: lng })
         });
         if (r.ok) {
             var result = await r.json();
@@ -520,7 +543,7 @@ async function enviarReporte() {
             var r2 = await fetch(SUPABASE_URL + '/reportes_ciudadanos', {
                 method: 'POST',
                 headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
-                body: JSON.stringify({ tipo_problema: tipo, comentario: comentario || null, nombre: nombre || null, telefono: telefono || null, geom: { type: 'Point', coordinates: [lng, lat] }, estado: estado })
+                body: JSON.stringify({ tipo_problema: tipo, comentario: comentario || null, nombre: nombre || null, telefono: telefono || null, geom: { type: 'Point', coordinates: [lng, lat] } })
             });
             if (r2.ok) {
                 var rows = await r2.json();
@@ -541,7 +564,6 @@ async function enviarReporte() {
 
     if (enviado) {
         document.getElementById('rpt-tipo').value = '';
-        document.getElementById('rpt-estado').value = 'pendiente';
         document.getElementById('rpt-comentario').value = '';
         document.getElementById('rpt-nombre').value = '';
         document.getElementById('rpt-telefono').value = '';
@@ -555,7 +577,7 @@ async function enviarReporte() {
 }
 
 window.toggleLayer=toggleLayer;window.cargarTodasLasCapas=cargarTodasLasCapas;window.generarPDF=generarPDF;window.activarAnalisis=activarAnalisis;
-window.abrirFormulario=abrirFormulario;window.cerrarFormulario=cerrarFormulario;window.enviarReporte=enviarReporte;
+window.abrirFormulario=abrirFormulario;window.cerrarFormulario=cerrarFormulario;window.enviarReporte=enviarReporte;window.cambiarEstado=cambiarEstado;
 
 window.addEventListener('load',function(){
     Object.keys(capasConfig).forEach(function(t){toggleLayer(t);});

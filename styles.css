@@ -554,6 +554,24 @@ body {
 
 .optional { color: #64748b; font-weight: normal; font-size: 11px; }
 
+.estado-buttons {
+  display: flex; gap: 4px; flex-wrap: wrap;
+}
+
+.estado-btn {
+  padding: 5px 10px;
+  border: 1px solid #2a3e2a;
+  border-radius: 4px;
+  background: #1a2e1a;
+  color: #a5d6a7;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.estado-btn:hover { background: #2e5e30; }
+.estado-btn.active { border-color: transparent; }
+
 /* ===== Responsive ===== */
 
 @media (max-width: 768px) {
